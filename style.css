@@ -185,10 +185,20 @@ button.danger:hover { background: var(--danger); color: white; }
 .start-box button { font-size: 1.2rem; padding: 20px 40px; border: 2px solid var(--accent); color: var(--accent); background: transparent; }
 
 @media (max-width: 768px) {
-    #cockpit-ui { padding: 15px; flex-direction: column; gap: 20px; height: auto; }
-    .stat-group { order: 1; }
-    .control-group { order: 2; width: 100%; flex-direction: column; gap: 10px; }
-    .button-strip { order: 3; width: 100%; justify-content: space-around; }
-    #speed-display { font-size: 2.5rem; }
-    input[type=range] { height: 40px; } 
+    #alp-hud { top: 10px; left: 10px; transform: scale(0.85); transform-origin: top left; }
+    #mission-stat { font-size: 0.9rem; top: 10px; right: 10px; padding: 5px 10px; }
+    #cockpit-ui { 
+        padding: 10px 20px; 
+        flex-direction: row; 
+        flex-wrap: wrap; 
+        justify-content: space-around; 
+        gap: 10px; 
+    }
+    .stat-group { min-width: 100px; flex: 1 1 100%; order: 1; }
+    #speed-display { font-size: 2.8rem; margin-top: -5px; }
+    .control-group { order: 2; width: 100%; gap: 15px; margin-bottom: 5px; }
+    .lever-wrapper label { margin-bottom: 5px; font-size: 0.65rem; }
+    .button-strip { order: 3; width: 100%; gap: 8px; }
+    button { padding: 8px 15px; font-size: 0.7rem; flex: 1; }
+    input[type=range] { height: 35px; }
 }
