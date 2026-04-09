@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Realistic Train Simulator Pro | Indian Railways</title>
+    <link rel="icon" type="image/x-icon" href="assets/alp.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="start-overlay" onclick="window.startMobileAudio()">
+        <div class="start-box">
+            <h1>INDIAN RAILWAYS</h1>
+            <p>High Fidelity Simulator</p>
+            <button>TAP TO START SYSTEMS</button>
+        </div>
+    </div>
+
+    <div class="game-wrapper">
+        <!-- ALP HUD Overlay -->
+        <div id="alp-hud">
+            <div id="mission-stat">
+                <span id="mission-timer">ETA: 10:00</span>
+            </div>
+            <div id="alp-container">
+                <img id="alp-avatar" src="assets/alp.png" alt="ALP Avatar">
+                <div id="alp-dialogue">
+                    <p id="alp-name">Assistant Loco Pilot (ALP)</p>
+                    <p id="signal-callout">Initializing systems...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fullscreen Canvas -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Pro Cockpit Cockpit -->
+        <div id="cockpit-ui">
+            <div class="stat-group">
+                <span class="label">SPEED</span>
+                <span id="speed-display">0</span>
+                <span class="unit">KM/H</span>
+            </div>
+
+            <div class="control-group">
+                <div class="lever-wrapper">
+                    <label>THROTTLE (LIVER)</label>
+                    <input type="range" id="throttle-liver" min="0" max="100" value="0">
+                </div>
+                <div class="lever-wrapper">
+                    <label>BRAKE (LIVER)</label>
+                    <input type="range" id="brake-liver" min="0" max="100" value="0">
+                </div>
+            </div>
+
+            <div class="button-strip">
+                <button onclick="window.horn()">HORN [H]</button>
+                <button id="brake-btn" class="danger" onclick="window.emergencyBrake()">EMERGENCY BRAKE [B]</button>
+                <button id="light-btn" onclick="window.toggleLights()">LIGHTS [L]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phaser for core engine -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
