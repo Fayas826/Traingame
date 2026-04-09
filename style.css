@@ -155,14 +155,15 @@ button {
 }
 
 /* 📱 SURGICAL MOBILE AUTO-ADAPT (V151.13) */
+/* 📱 SURGICAL MOBILE AUTO-ADAPT (V151.16 - DYNAMIC ZOOM) */
 @media (max-width: 900px) {
-    #alp-hud { transform: scale(0.7); transform-origin: top left; top: 10px; left: 10px; }
+    #alp-hud { top: 10px; left: 10px; }
     #cockpit-ui { 
         padding: 10px 15px; 
-        height: 140px; 
         flex-direction: row; 
         flex-wrap: wrap;
         justify-content: space-around;
+        height: auto; /* Height now managed by Scale */
     }
     .stat-group { min-width: 100px; flex: 0; order: 1; }
     #speed-display { font-size: 2.8rem; }

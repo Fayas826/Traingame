@@ -101,6 +101,31 @@ function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     CONFIG.trackY = canvas.height - 250;
+    
+    // 📱 PROPORTIONAL AUTO-ZOOM (V151.16)
+    // Automatically fits any screen size by scaling the UI wrapper
+    const wrapper = document.querySelector('.game-wrapper');
+    const baseHeight = 1080; // Ideal height
+    const currentHeight = window.innerHeight;
+    const scale = Math.min(1, currentHeight / 800); // Only zoom out on small heights
+    
+    // Apply zoom primarily to the UI elements to keep logic (Canvas) separate
+    const cockpit = document.getElementById('cockpit-ui');
+    const alpHud = document.getElementById('alp-hud');
+    const missionStat = document.getElementById('mission-stat');
+    
+    if(window.innerWidth < 900) {
+        cockpit.style.transform = `scale(${scale})`;
+        cockpit.style.transformOrigin = 'bottom left';
+        cockpit.style.width = `${100 / scale}%`;
+        
+        alpHud.style.transform = `scale(${scale * 0.9})`;
+        alpHud.style.transformOrigin = 'top left';
+    } else {
+        cockpit.style.transform = 'none';
+        cockpit.style.width = '100%';
+        alpHud.style.transform = 'none';
+    }
 }
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
