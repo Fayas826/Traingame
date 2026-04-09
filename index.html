@@ -2,45 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Realistic Train Simulator Pro | Indian Railways</title>
-    <link rel="icon" type="image/x-icon" href="assets/alp.png">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div id="start-overlay" onclick="window.startMobileAudio()">
-        <div class="start-box">
-            <h1>INDIAN RAILWAYS</h1>
-            <p>High Fidelity Simulator</p>
-            <button>TAP TO START SYSTEMS</button>
-        </div>
-    </div>
-
     <div class="game-wrapper">
-        <!-- ALP HUD Overlay -->
         <div id="alp-hud">
-            <div id="mission-stat">
-                <span id="mission-timer">ETA: 10:00</span>
-            </div>
             <div id="alp-container">
-                <img id="alp-avatar" src="assets/alp.png" alt="ALP Avatar">
-                <div id="alp-dialogue">
-                    <p id="alp-name">Assistant Loco Pilot (ALP)</p>
-                    <p id="signal-callout">Initializing systems...</p>
+                <img id="alp-avatar" src="assets/alp.png" alt="ALP">
+                <div>
+                    <div id="alp-name">Assistant Loco Pilot (ALP)</div>
+                    <div id="signal-callout">🟢 Starter signal green</div>
                 </div>
             </div>
         </div>
 
-        <!-- Fullscreen Canvas -->
+        <div id="mission-stat">MISSION: KOLLAM → TVC</div>
+
         <canvas id="gameCanvas"></canvas>
 
-        <!-- Pro Cockpit Cockpit -->
         <div id="cockpit-ui">
             <div class="stat-group">
                 <span class="label">SPEED</span>
-                <span id="speed-display">0</span>
-                <span class="unit">KM/H</span>
+                <div id="speed-display">0</div>
+                <span class="label" style="font-size: 0.6rem; color: var(--accent)">KM/H</span>
             </div>
 
             <div class="control-group">
@@ -56,14 +42,29 @@
 
             <div class="button-strip">
                 <button onclick="window.horn()">HORN [H]</button>
-                <button id="brake-btn" class="danger" onclick="window.emergencyBrake()">EMERGENCY BRAKE [B]</button>
+                <button class="danger" onclick="window.emergencyBrake()">EMERGENCY BRAKE [B]</button>
                 <button id="light-btn" onclick="window.toggleLights()">LIGHTS [L]</button>
             </div>
         </div>
     </div>
 
-    <!-- Phaser for core engine -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+    <div id="start-overlay">
+        <div class="start-box">
+            <h1>INDIAN RAILWAYS</h1>
+            <p>Realistic Simulator Pro</p>
+            <button onclick="startMobileAudio()">TAP TO START SYSTEMS</button>
+        </div>
+    </div>
+
+    <!-- 📱 ORIENTATION LOCK OVERLAY (V151.11) -->
+    <div id="orientation-overlay">
+        <div class="rotate-box">
+            <div style="font-size: 3rem; margin-bottom: 15px;">🔄</div>
+            <h2 style="font-family: Arial, sans-serif; color: #00ff88;">PLEASE ROTATE DEVICE</h2>
+            <p style="color: white; font-family: Arial, sans-serif;">Landscape mode required for driving</p>
+        </div>
+    </div>
+
     <script src="main.js"></script>
 </body>
 </html>
