@@ -87,7 +87,7 @@ body {
     font-family: 'Orbitron', sans-serif;
 }
 
-/* 🕹️ COCKPIT UI */
+/* 🕹️ COCKPIT UI - STABLE ORIGIN (V151.14) */
 #cockpit-ui {
     position: absolute;
     bottom: 0;
@@ -106,14 +106,6 @@ body {
 .stat-group {
     text-align: center;
     min-width: 200px;
-}
-
-.label {
-    display: block;
-    font-size: 0.8rem;
-    color: #666;
-    margin-bottom: 5px;
-    letter-spacing: 2px;
 }
 
 #speed-display {
@@ -162,9 +154,23 @@ button {
     font-size: 0.8rem;
 }
 
-button:hover { background: #333; border-color: #666; }
-button.danger { background: rgba(255,68,68,0.2); border-color: var(--danger); color: var(--danger); }
-button.danger:hover { background: var(--danger); color: white; }
+/* 📱 SURGICAL MOBILE AUTO-ADAPT (V151.13) */
+@media (max-width: 900px) {
+    #alp-hud { transform: scale(0.7); transform-origin: top left; top: 10px; left: 10px; }
+    #cockpit-ui { 
+        padding: 10px 15px; 
+        height: 140px; 
+        flex-direction: row; 
+        flex-wrap: wrap;
+        justify-content: space-around;
+    }
+    .stat-group { min-width: 100px; flex: 0; order: 1; }
+    #speed-display { font-size: 2.8rem; }
+    .control-group { order: 2; width: 45%; gap: 15px; margin: 0; }
+    .lever-wrapper label { font-size: 0.6rem; margin-bottom: 5px; }
+    .button-strip { order: 3; width: 40%; gap: 8px; flex-direction: column; }
+    button { padding: 8px 12px; font-size: 0.6rem; }
+}
 
 /* 📱 ORIENTATION LOGIC (V151.11) */
 #orientation-overlay {
@@ -178,22 +184,6 @@ button.danger:hover { background: var(--danger); color: white; }
     #orientation-overlay { display: flex; }
 }
 
-@media (max-width: 768px) {
-    #alp-hud { top: 10px; left: 10px; transform: scale(0.7); transform-origin: top left; }
-    #cockpit-ui { 
-        padding: 10px; 
-        flex-direction: row; 
-        flex-wrap: wrap; 
-        height: 140px; 
-        background: rgba(0,0,0,0.95);
-    }
-    .stat-group { min-width: 80px; flex: 0; order: 1; }
-    #speed-display { font-size: 2.2rem; }
-    .control-group { order: 2; width: 45%; gap: 10px; }
-    .button-strip { order: 3; width: 35%; gap: 5px; flex-direction: column; }
-    button { padding: 6px 10px; font-size: 0.6rem; }
-}
-
 #start-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.9); backdrop-filter: blur(15px);
@@ -201,4 +191,5 @@ button.danger:hover { background: var(--danger); color: white; }
     z-index: 1000; text-align: center;
 }
 .start-box h1 { font-family: 'Orbitron', sans-serif; font-size: 3rem; color: var(--accent); margin-bottom: 10px; }
+.start-box button { font-size: 1.2rem; padding: 20px 40px; border: 2px solid var(--accent); color: var(--accent); background: transparent; }
 .start-box button { font-size: 1.2rem; padding: 20px 40px; border: 2px solid var(--accent); color: var(--accent); background: transparent; }

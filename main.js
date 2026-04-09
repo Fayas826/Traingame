@@ -293,7 +293,9 @@ function drawDigitalCockpitGauges() {
     ctx.beginPath(); ctx.arc(gx, gy, 80, 0, Math.PI*2); ctx.fill(); ctx.stroke();
     ctx.save(); ctx.translate(gx, gy);
     ctx.rotate(-Math.PI/1.2 + (speed / CONFIG.maxSpeed) * Math.PI*1.5);
-    ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-65); ctx.stroke();
+    ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 8; // Thickening for video parity
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-72); // Length matched to video
+    ctx.stroke();
     ctx.restore();
     ctx.fillStyle = 'rgba(0, 20, 0, 0.9)'; ctx.fillRect(gx+120, gy-60, 40, 120);
     ctx.fillStyle = '#ff0'; ctx.fillRect(gx+125, gy+55, 30, -throttle * 110);
