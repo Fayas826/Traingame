@@ -15,18 +15,33 @@ const CONFIG = {
     scrollingMultiplier: 4.8
 };
 
-let canvas, ctx, speed = 0, worldDistance = 0, bgX = 0, throttle = 0, brake = 0;
+let canvas, ctx, speedCanvas, sctx, speed = 0, worldDistance = 0, bgX = 0, throttle = 0, brake = 0;
 let clouds = [], hills = [], trees = [], stations = [], signals = [], mountains = [];
 let coachOffsets = [];
 let timeOfDay = 0, wheelRotation = 0; 
 let audioStarted = false, hornAudio, locoAudio, slowTrackAudio, fastTrackAudio, crowdAudio;
 let lampsOn = false, lastAlpMsg = "", lastTrackSoundDist = 0;
 let oppTrain = null, rainDrops = [], isRaining = false, rainAlpha = 0;
+
+// High-Fidelity Assets & Systems
+let imgSky = new Image(); imgSky.src = 'assets/sky.png';
+let imgMountains = new Image(); imgMountains.src = 'assets/mountains.png';
+let imgCity = new Image(); imgCity.src = 'assets/cityscape.png';
+let particles = [];
+let stars = [], foregroundObjects = [];
+for(let i=0; i<150; i++) stars.push({x: Math.random()*3000, y: Math.random()*800, s: Math.random()*2.5 + 0.5, a: Math.random()});
+let tunnelAlpha = 0;
 let starterTimer = 7, isWaitingForStarter = true; // 🚦 7-Sec Starter State
 
 function init() {
     canvas = document.getElementById(CONFIG.canvasId);
     ctx = canvas.getContext('2d', { alpha: false });
+    
+    speedCanvas = document.getElementById("speedCanvas");
+    sctx = speedCanvas.getContext("2d");
+    speedCanvas.width = 120;
+    speedCanvas.height = 120;
+
     resize();
     window.addEventListener('resize', resize);
 
@@ -35,6 +50,9 @@ function init() {
     locoAudio.loop = true;
     slowTrackAudio = new Audio('assets/short.mp3');
     fastTrackAudio = new Audio('assets/long.mp3');
+    crowdAudio = new Audio('assets/crowd.mp3');
+    crowdAudio.loop = true;
+    crowdAudio.volume = 0;
 
     for(let i=0; i<4; i++) coachOffsets.push(0); 
     for(let i=0; i<12; i++) spawnMountain();
@@ -99,33 +117,8 @@ function init() {
 
 function resize() {
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    CONFIG.trackY = canvas.height - 250;
-    
-    // 📱 PROPORTIONAL AUTO-ZOOM (V151.16)
-    // Automatically fits any screen size by scaling the UI wrapper
-    const wrapper = document.querySelector('.game-wrapper');
-    const baseHeight = 1080; // Ideal height
-    const currentHeight = window.innerHeight;
-    const scale = Math.min(1, currentHeight / 800); // Only zoom out on small heights
-    
-    // Apply zoom primarily to the UI elements to keep logic (Canvas) separate
-    const cockpit = document.getElementById('cockpit-ui');
-    const alpHud = document.getElementById('alp-hud');
-    const missionStat = document.getElementById('mission-stat');
-    
-    if(window.innerWidth < 900) {
-        cockpit.style.transform = `scale(${scale})`;
-        cockpit.style.transformOrigin = 'bottom left';
-        cockpit.style.width = `${100 / scale}%`;
-        
-        alpHud.style.transform = `scale(${scale * 0.9})`;
-        alpHud.style.transformOrigin = 'top left';
-    } else {
-        cockpit.style.transform = 'none';
-        cockpit.style.width = '100%';
-        alpHud.style.transform = 'none';
-    }
+    canvas.height = window.innerHeight * 0.7;
+    CONFIG.trackY = canvas.height * 0.85;
 }
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
@@ -153,7 +146,7 @@ function speakALP(text) {
     window.speechSynthesis.speak(u);
 }
 
-function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+function gameLoop() { update(); draw(); drawSpeedometerUI(); requestAnimationFrame(gameLoop); }
 
 function update() {
     // 🚦 STARTER SIGNAL TIMER (7 SECONDS)
@@ -170,6 +163,27 @@ function update() {
     let distKM = worldDistance / 1000;
     isRaining = (distKM > 30 && distKM < 50) || (distKM > 130 && distKM < 150);
     rainAlpha = isRaining ? Math.min(rainAlpha + 0.01, 0.6) : Math.max(rainAlpha - 0.01, 0);
+
+    // Tunnel bounds logic
+    if ((distKM > 60 && distKM < 62) || (distKM > 90 && distKM < 92) || (distKM > 120 && distKM < 121)) {
+        tunnelAlpha = Math.min(tunnelAlpha + 0.02, 1.0);
+    } else {
+        tunnelAlpha = Math.max(tunnelAlpha - 0.02, 0);
+    }
+    
+    // Twinkle stars
+    stars.forEach(s => {
+        s.a += (Math.random() - 0.5) * 0.1;
+        s.a = Math.max(0.1, Math.min(s.a, 1.0));
+    });
+
+    if (Math.random() < 0.08 && speed > 2) {
+        foregroundObjects.push({x: canvas.width + 100, isPole: Math.random() < 0.2});
+    }
+    foregroundObjects.forEach((f, index) => { 
+        f.x -= speed * 1.5; 
+        if (f.x < -200) foregroundObjects.splice(index, 1); 
+    });
 
     let traction = isRaining ? 0.65 : 1.0;
     let friction = 0.003 + (speed * 0.001);
@@ -209,6 +223,18 @@ function update() {
         } else if (speed === 0 || speed >= 5 || !atStation) {
             window.hummingActive = false; locoAudio.volume = 0; if(!locoAudio.paused) locoAudio.pause();
         }
+        
+        // Crowd Proximity Audio
+        let nearestDist = 999999;
+        stations.forEach(s => { let d = Math.abs(worldDistance - s.x); if(d < nearestDist) nearestDist = d; });
+        if(nearestDist < 4000 && crowdAudio) {
+            let targetVol = 1.0 - (nearestDist / 4000);
+            crowdAudio.volume = Math.max(0, Math.min(1, targetVol));
+            if(crowdAudio.paused) crowdAudio.play().catch(()=>{});
+        } else if (crowdAudio) {
+            crowdAudio.volume = 0;
+            if(!crowdAudio.paused) crowdAudio.pause();
+        }
     }
 
     // 🏔️ ASSET UPDATE
@@ -217,7 +243,23 @@ function update() {
     if(Math.random() < 0.2) spawnTreeLayered();
     clouds.forEach(c => { c.x -= speed * (c.layer === 0 ? 0.05 : 0.15); if(c.x < -600) c.x = canvas.width + 600; });
 
-    document.getElementById('speed-display').innerText = (speed * 11).toFixed(0);
+    // 🔥 DYNAMIC PARTICLE PHYSICS
+    if (throttle > 0.7 && speed > 2 && Math.random() < 0.2) {
+        // Pantograph blue/white sparks
+        particles.push({x: CONFIG.trainX + 380, y: CONFIG.trackY - 325 - Math.random()*10, vx: -speed*0.5 - Math.random()*2, vy: (Math.random()-0.5)*2, type: 'spark', a: 1.0, c: '#aaddff'});
+    }
+    if (brake > 0.5 && speed > 3) {
+        // High friction brake sparks at the front wheels
+        for(let z=0; z<3; z++) {
+            particles.push({x: CONFIG.trainX + 80 + Math.random()*20, y: CONFIG.trackY - 10, vx: -speed*1.2 - Math.random()*5, vy: -Math.random()*4, type: 'fire', a: 1.0, c: Math.random() > 0.5 ? '#ff5500' : '#ff9900'});
+        }
+    }
+    particles.forEach((p, i) => {
+        p.x += p.vx; p.y += p.vy;
+        if(p.type === 'spark') { p.a -= 0.05; }
+        if(p.type === 'fire') { p.a -= 0.08; p.vy += 0.2; } // gravity
+        if(p.a <= 0) particles.splice(i, 1);
+    });
 
     // 🚦 ALP SIGNAL CALLOUTS (CLIENT SPEC 3/9)
     let msg = isWaitingForStarter ? "🔴 Waiting for signal" : "🟢 Starter signal green";
@@ -242,22 +284,76 @@ function update() {
 
 function draw() {
     ctx.save();
-    let skyBright = Math.abs(500 - timeOfDay) / 5 * (isRaining ? 0.6 : 1);
+    let skyBrightRaw = Math.abs(500 - timeOfDay) / 5;
+    let distKM = worldDistance / 1000;
+    
+    // Day/Night & Sunset Logic
+    let isSunset = skyBrightRaw < 50 && skyBrightRaw > 25;
+    let isNight = skyBrightRaw <= 25;
+    let starOp = isNight ? 1 : (isSunset ? 0.3 : 0);
+    
     let skyGrd = ctx.createLinearGradient(0,0,0,CONFIG.trackY);
-    skyGrd.addColorStop(0, `hsl(210, 45%, ${skyBright}%)`);
-    skyGrd.addColorStop(1, `hsl(210, 45%, ${skyBright + 15}%)`);
+    if(isSunset) {
+        skyGrd.addColorStop(0, `hsl(280, 50%, 30%)`);
+        skyGrd.addColorStop(1, `hsl(15, 80%, 45%)`);
+    } else {
+        skyGrd.addColorStop(0, `hsl(210, 45%, ${skyBrightRaw * (isRaining ? 0.6 : 1)}%)`);
+        skyGrd.addColorStop(1, `hsl(210, 60%, ${skyBrightRaw * (isRaining ? 0.6 : 1) + 15}%)`);
+    }
     ctx.fillStyle = skyGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    if (starOp > 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+        stars.forEach(s => {
+            ctx.beginPath(); ctx.globalAlpha = s.a * starOp; ctx.arc(s.x, s.y, s.s, 0, Math.PI*2); ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+        // Moon
+        ctx.fillStyle = `rgba(255, 255, 220, ${starOp})`; ctx.beginPath(); ctx.arc(canvas.width - 300, 180, 50, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Parallax Layer 1: Sky
+    if(imgSky.complete && imgSky.width > 0) {
+        let skyOff = (bgX * 0.02) % imgSky.width;
+        // Draw sky highly opaque to hide old geometric shapes/gradient completely
+        ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
+        ctx.drawImage(imgSky, -skyOff, 0, imgSky.width, CONFIG.trackY);
+        ctx.drawImage(imgSky, imgSky.width - skyOff, 0, imgSky.width, CONFIG.trackY);
+        ctx.globalAlpha = 1.0;
+    }
+
     clouds.forEach(c => {
-        ctx.fillStyle = `rgba(255, 255, 255, ${c.op * 2.5})`;
+        let cBright = isNight ? 50 : 255;
+        ctx.fillStyle = `rgba(${cBright}, ${cBright}, ${cBright + (isSunset? -50 : 0)}, ${c.op * 2.5})`;
         for(let j=0; j<5; j++) ctx.beginPath(), ctx.arc(c.x + (j-2)*(c.sz/4), c.y + Math.sin(j)*15, c.sz/2, 0, Math.PI*2), ctx.fill();
     });
 
-    mountains.forEach(m => {
-        let mGrd = ctx.createLinearGradient(m.x, CONFIG.trackY-m.h, m.x, CONFIG.trackY);
-        mGrd.addColorStop(0, '#2d5a27'); mGrd.addColorStop(1, '#1b3022');
-        ctx.fillStyle = mGrd; ctx.beginPath(); ctx.moveTo(m.x, CONFIG.trackY); ctx.lineTo(m.x+m.sz/2, CONFIG.trackY-m.h); ctx.lineTo(m.x+m.sz, CONFIG.trackY); ctx.fill();
-    });
+    // Parallax Layer 2: Biome Mountains/City
+    let currentParallax = distKM > 100 ? imgCity : imgMountains;
+    if(currentParallax.complete && currentParallax.width > 0) {
+        let pW = canvas.width * 1.5;
+        let pOff = (bgX * 0.15) % pW;
+        
+        if(isNight) ctx.filter = 'brightness(30%)';
+        else if(isSunset) ctx.filter = 'brightness(60%) sepia(40%) hue-rotate(-20deg)';
+
+        // Crop the top 45% of the AI image to eliminate the fake checkerboard transparency
+        let cutY = currentParallax.height * 0.45;
+        let sH = currentParallax.height - cutY;
+        let destH = 500; // Stretch vertically to meet the track
+        
+        ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, -pOff, CONFIG.trackY - destH, pW, destH);
+        ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, pW - pOff, CONFIG.trackY - destH, pW, destH);
+        ctx.filter = 'none';
+
+        if(distKM > 100 && isNight) {
+            ctx.fillStyle = 'rgba(255,200,100,0.8)';
+            let winOff = (bgX * 0.15) % pW;
+            for(let w=0; w<40; w++) {
+                ctx.fillRect( (w*150 - winOff + pW)%pW, CONFIG.trackY - 150 - Math.random()*200, 6, 6 );
+            }
+        }
+    }
 
     trees.filter(t => t.layer === 2).forEach(drawTree);
 
@@ -276,19 +372,65 @@ function draw() {
     });
 
     if(oppTrain) drawOppositeTrain(oppTrain);
-    drawRestoredTrain();
     trees.filter(t => t.layer === 0).forEach(drawTree); 
+    drawRestoredTrain();
     drawForegroundGrass();
     
+    // Render Particles (Sparks & Smoke)
+    particles.forEach(p => {
+        ctx.fillStyle = p.c;
+        ctx.globalAlpha = p.a;
+        if(p.type === 'spark') {
+            ctx.beginPath(); ctx.arc(p.x, p.y, Math.random()*3 + 1, 0, Math.PI*2); ctx.fill();
+        } else if(p.type === 'fire') {
+            ctx.fillRect(p.x, p.y, 4, 4);
+        }
+    });
+    ctx.globalAlpha = 1.0;
+
     if(rainAlpha > 0) {
-        ctx.strokeStyle = `rgba(200, 220, 255, ${rainAlpha * 0.5})`;
         rainDrops.forEach(d => {
             d.y += d.s; d.x -= speed; if(d.y > canvas.height) d.y = -20; if(d.x < 0) d.x = canvas.width;
+            
+            // Illuminating rain in the headlight cone
+            let isIlluminated = lampsOn && d.x > CONFIG.trainX + 500 && d.y > CONFIG.trackY - 200 && d.y < CONFIG.trackY + 300;
+            ctx.strokeStyle = isIlluminated ? `rgba(255, 255, 100, ${rainAlpha})` : `rgba(200, 220, 255, ${rainAlpha * 0.5})`;
+            ctx.lineWidth = isIlluminated ? 2 : 1;
+            
             ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x-5, d.y+15); ctx.stroke();
         });
     }
 
-    drawDigitalCockpitGauges();
+    // Foreground High-Speed Overlay
+    foregroundObjects.forEach(f => {
+        if(f.isPole) {
+            ctx.fillStyle = '#222'; ctx.fillRect(f.x, CONFIG.trackY - 120, 20, canvas.height);
+            ctx.fillStyle = '#ff3333'; ctx.fillRect(f.x - 5, CONFIG.trackY - 80, 30, 30);
+        } else {
+            ctx.fillStyle = '#0f2f0f'; ctx.beginPath(); ctx.arc(f.x, canvas.height - 20, 80, 0, Math.PI*2); ctx.fill();
+        }
+    });
+
+    // Dark Tunnel Overlay
+    if(tunnelAlpha > 0) {
+        ctx.fillStyle = `rgba(5, 5, 8, ${tunnelAlpha})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        if(lampsOn) {
+            ctx.globalCompositeOperation = 'destination-out';
+            let lGrd = ctx.createRadialGradient(CONFIG.trainX + 450, CONFIG.trackY - 60, 20, CONFIG.trainX + 1500, CONFIG.trackY - 60, 700);
+            lGrd.addColorStop(0, `rgba(255, 255, 255, ${tunnelAlpha})`);
+            lGrd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = lGrd;
+            ctx.beginPath();
+            ctx.moveTo(CONFIG.trainX + 450, CONFIG.trackY - 60);
+            ctx.lineTo(CONFIG.trainX + 2500, CONFIG.trackY - 500);
+            ctx.lineTo(CONFIG.trainX + 2500, CONFIG.trackY + 500);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+        }
+    }
+
     ctx.restore();
 }
 
@@ -311,25 +453,45 @@ function drawSignals4Aspect() {
     });
 }
 
-function drawDigitalCockpitGauges() {
-    ctx.save();
-    let gx = 150, gy = canvas.height - 130;
-    ctx.fillStyle = 'rgba(0, 20, 0, 0.9)'; ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(gx, gy, 80, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-    ctx.save(); ctx.translate(gx, gy);
-    ctx.rotate(-Math.PI/1.2 + (speed / CONFIG.maxSpeed) * Math.PI*1.5);
-    ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 8; // Thickening for video parity
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-72); // Length matched to video
-    ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle = 'rgba(0, 20, 0, 0.9)'; ctx.fillRect(gx+120, gy-60, 40, 120);
-    ctx.fillStyle = '#ff0'; ctx.fillRect(gx+125, gy+55, 30, -throttle * 110);
-    ctx.restore();
+function drawSpeedometerUI() {
+    if(!sctx) return;
+    const cx = 60;
+    const cy = 60;
+
+    sctx.clearRect(0, 0, 120, 120);
+
+    // circle
+    sctx.strokeStyle = "#00ff88";
+    sctx.lineWidth = 4;
+    sctx.beginPath();
+    sctx.arc(cx, cy, 50, 0, Math.PI * 2);
+    sctx.stroke();
+
+    // needle
+    let displaySpeed = speed * 11;
+    let angle = (displaySpeed / 160) * Math.PI;
+    sctx.strokeStyle = "#00ff88";
+    sctx.beginPath();
+    sctx.moveTo(cx, cy);
+    sctx.lineTo(
+        cx + Math.cos(angle - Math.PI / 2) * 40,
+        cy + Math.sin(angle - Math.PI / 2) * 40
+    );
+    sctx.stroke();
+
+    // 🔥 SPEED TEXT (BOTTOM — FIXED)
+    sctx.fillStyle = "#00ffcc";
+    sctx.font = "bold 14px Arial";
+    sctx.textAlign = "center";
+
+    sctx.fillText(Math.floor(displaySpeed), cx, cy + 25); // bottom position
+    sctx.font = "10px Arial";
+    sctx.fillText("KM/H", cx, cy + 40);
 }
 
 function drawRestoredTrain() {
     // 📐 ABSOLUTE GROUNDING: Sub-pixel 1.5px drop for final contact
-    let y = CONFIG.trackY - 110.5; 
+    let y = CONFIG.trackY - 94; 
     // 🔗 COUPLER & CORRIDOR LOGIC
     for(let i=1; i<=4; i++) {
         let cx = CONFIG.trainX - (i * 440);
@@ -359,67 +521,184 @@ function drawOppositeTrain(train) {
 }
 
 function drawWAP7Procedural(x, y) {
-    const W = 520, H = 85; // 📉 SCALED TO MATCH COACH (V150.9)
+    const W = 520, H = 85; 
     drawBogie(x + 80, y + H - 15); drawBogie(x + 340, y + H - 15);
     
-    ctx.fillStyle = '#b30000';
+    // Draw Pantograph Framework
+    ctx.strokeStyle = '#444'; ctx.lineWidth = 4;
+    let px = x + 380, py = y, pHeight = Math.abs(py - (CONFIG.trackY - 325)); 
+    let shudder = (speed > 5) ? (Math.random() * 4 - 2) : 0;
+    
+    ctx.beginPath(); 
+    ctx.moveTo(px-10, py); ctx.lineTo((px-40)+shudder, py-pHeight/2); 
+    ctx.lineTo(px+shudder, py-pHeight); 
+    ctx.moveTo((px-40)+shudder, py-pHeight/2); ctx.lineTo((px+20)+shudder, py-pHeight/2); 
+    ctx.stroke();
+    // Contact bar on wire
+    ctx.fillStyle = '#222'; ctx.fillRect(px-30+shudder, py-pHeight-5, 60, 8);
+    ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(px, py-2, 8, 0, Math.PI*2); ctx.fill(); // Base Insulator
+
+    // Main Engine Body Background Gradient
+    let bodyGrd = ctx.createLinearGradient(0, y, 0, y + H);
+    bodyGrd.addColorStop(0, '#e74c3c');   // Highlights
+    bodyGrd.addColorStop(0.3, '#c0392b'); // Base Red
+    bodyGrd.addColorStop(1, '#641e16');   // Shadow bottom
+    
+    ctx.fillStyle = bodyGrd;
     ctx.beginPath();
-    ctx.moveTo(x + 50, y + 5); ctx.lineTo(x + W - 50, y + 5); 
+    ctx.moveTo(x + 50, y + 5); 
+    ctx.lineTo(x + W - 30, y + 5); 
     ctx.bezierCurveTo(x + W + 10, y + 5, x + W + 30, y + 30, x + W + 30, y + H - 15); 
-    ctx.lineTo(x + W + 30, y + H); ctx.lineTo(x - 30, y + H); 
+    ctx.lineTo(x + W + 30, y + H); 
+    ctx.lineTo(x - 30, y + H); 
     ctx.lineTo(x - 30, y + H - 15); 
     ctx.bezierCurveTo(x - 30, y + 30, x - 10, y + 5, x + 50, y + 5); 
     ctx.fill();
 
-    ctx.fillStyle = '#fafafa'; ctx.fillRect(x - 30, y + 42, W + 60, 16);
-
-    ctx.strokeStyle = '#555'; ctx.lineWidth = 4;
-    let px = x + 380, py = y, pHeight = Math.abs(py - (CONFIG.trackY - 325)); 
-    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px-40, py-pHeight/2); ctx.lineTo(px, py-pHeight); ctx.lineTo(px + 60, py - pHeight); ctx.stroke();
-    ctx.fillStyle = '#222'; ctx.fillRect(px-15, py-pHeight-5, 90, 8);
-
-    ctx.fillStyle = 'white'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
-    ctx.fillText("भारतीय रेल", x + W/2, y + 38);
-    ctx.font = 'bold 16px Arial'; ctx.fillText("WAP-7 30602", x + W/2, y + 78);
+    // The white stripe with metallic gradient
+    let stripeGrd = ctx.createLinearGradient(0, y + 42, 0, y + 60);
+    stripeGrd.addColorStop(0, '#ffffff'); stripeGrd.addColorStop(1, '#95a5a6');
+    ctx.fillStyle = stripeGrd; 
+    ctx.fillRect(x - 30, y + 42, W + 58, 18);
     
-    ctx.fillStyle = '#fafafa'; ctx.beginPath(); ctx.arc(x + 100, y + 25, 18, 0, Math.PI*2); ctx.fill(); 
+    // Advanced Louvers / Vents on the stripe
+    ctx.fillStyle = '#2c3e50';
+    for(let i=0; i<6; i++) {
+        let lx = x + 30 + (i * 65);
+        ctx.fillRect(lx, y + 45, 40, 12); // Vent background
+        ctx.fillStyle = '#111';
+        for(let j=0; j<8; j++) ctx.fillRect(lx + j*5, y + 45, 2, 12); // Grills
+        ctx.fillStyle = '#2c3e50';
+    }
 
+    // Cab Windows (Driver Seat)
+    let cabGrd = ctx.createLinearGradient(x + W - 10, y + 10, x + W + 25, y + 40);
+    cabGrd.addColorStop(0, '#111'); cabGrd.addColorStop(0.5, '#2980b9'); cabGrd.addColorStop(1, '#111');
+    ctx.fillStyle = cabGrd;
+    ctx.beginPath();
+    ctx.moveTo(x + W - 5, y + 10); ctx.lineTo(x + W + 15, y + 10);
+    ctx.lineTo(x + W + 22, y + 40); ctx.lineTo(x + W - 10, y + 40);
+    ctx.fill();
+    ctx.strokeStyle = '#ecf0f1'; ctx.lineWidth = 2; ctx.stroke(); // Window frame
+
+    // Secondary Cab (Rear)
+    ctx.fill(); ctx.beginPath(); ctx.moveTo(x + 5, y + 10); ctx.lineTo(x - 15, y + 10); ctx.lineTo(x - 22, y + 40); ctx.lineTo(x + 10, y + 40); ctx.fill(); ctx.stroke();
+
+    // Roof equipment (Insulators & equipment boxes)
+    ctx.fillStyle = '#bdc3c7'; ctx.fillRect(x+100, y-5, 60, 10); ctx.fillRect(x+210, y-5, 80, 10);
+    ctx.fillStyle = '#8e44ad'; ctx.fillRect(x+115, y-10, 10, 15); ctx.fillRect(x+135, y-10, 10, 15);
+    ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.arc(x+250, y+5, 12, 0, Math.PI, true); ctx.fill();
+
+    // Typography & Logos
+    ctx.fillStyle = 'white'; ctx.font = 'bold 18px Arial'; ctx.textAlign = 'center';
+    ctx.fillText("भारतीय रेल", x + W/2, y + 25);
+    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 14px Arial';
+    ctx.fillText("WAP-7  30602", x + W/2, y + 38);
+
+    // Dynamic Headlight Casing
+    ctx.fillStyle = lampsOn ? '#ffffe0' : '#7f8c8d';
+    ctx.beginPath(); ctx.arc(x + W + 28, y + 48, 6, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+    
+    // Headlights Cone Array
     if(lampsOn) {
-        ctx.fillStyle = 'rgba(255, 255, 180, 0.4)';
-        ctx.beginPath(); ctx.moveTo(x+W+30, y+70); ctx.lineTo(x+W+800, y-150); ctx.lineTo(x+W+800, y+400); ctx.fill();
+        let lGrd = ctx.createLinearGradient(x + W + 30, y + 48, x + W + 1200, y + 48);
+        lGrd.addColorStop(0, 'rgba(255, 255, 180, 0.8)');
+        lGrd.addColorStop(1, 'rgba(255, 255, 180, 0.0)');
+        ctx.fillStyle = lGrd;
+        ctx.beginPath(); ctx.moveTo(x+W+30, y+48); ctx.lineTo(x+W+1200, y-200); ctx.lineTo(x+W+1200, y+400); ctx.fill();
     }
 }
 
 function drawLHBProcedural(x, y) {
-    const W = 400, H = 85; // 📉 REDUCED SCALE (V150.5)
+    const W = 400, H = 85; 
     drawBogie(x + 40, y + H - 12); drawBogie(x + 260, y + H - 12);
     
-    ctx.fillStyle = '#b30000'; ctx.fillRect(x, y, W, H/2); 
-    ctx.fillStyle = '#9e9e9e'; ctx.fillRect(x, y + H/2, W, H/2); 
+    // Rajdhani Red Scheme with Gradients
+    let redGrd = ctx.createLinearGradient(0, y, 0, y + H/2);
+    redGrd.addColorStop(0, '#e74c3c'); redGrd.addColorStop(1, '#922b21');
+    ctx.fillStyle = redGrd; ctx.fillRect(x, y, W, H/2); 
     
-    ctx.fillStyle = '#b30000';
-    ctx.fillRect(x + 5, y + 8, 35, H - 16); // Door 1
-    ctx.fillRect(x + W - 40, y + 8, 35, H - 16); // Door 2
+    let greyGrd = ctx.createLinearGradient(0, y + H/2, 0, y + H);
+    greyGrd.addColorStop(0, '#bdc3c7'); greyGrd.addColorStop(1, '#566573');
+    ctx.fillStyle = greyGrd; ctx.fillRect(x, y + H/2, W, H/2); 
+    
+    // Corrugated Roof Lines
+    ctx.strokeStyle = '#b30000'; ctx.lineWidth = 1;
+    for(let r=0; r<W; r+=8) {
+        ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + r, y + 6); ctx.stroke();
+    }
+    
+    // Doors
+    ctx.fillStyle = '#a93226'; ctx.fillRect(x + 5, y + 8, 35, H - 16); 
+    ctx.fillRect(x + W - 40, y + 8, 35, H - 16); 
+    
+    // Door yellow Grab-rails
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillRect(x + 4, y + 16, 2, 45); ctx.fillRect(x + 40, y + 16, 2, 45);
+    ctx.fillRect(x + W - 41, y + 16, 2, 45); ctx.fillRect(x + W - 5, y + 16, 2, 45);
 
+    // Advanced Tinted Windows
     for(let i=0; i<8; i++) {
         let wx = x + 60 + i * 38;
-        ctx.fillStyle = '#222'; ctx.fillRect(wx, y + 12, 28, 38); 
-        ctx.fillStyle = 'rgba(0, 100, 200, 0.4)'; ctx.fillRect(wx + 3, y + 15, 22, 32); 
+        // Outer Rubber Seal
+        ctx.fillStyle = '#111'; ctx.fillRect(wx, y + 12, 28, 38); 
+        // Gradient Blue Glass
+        let wGrd = ctx.createLinearGradient(wx, y+15, wx+22, y+47);
+        wGrd.addColorStop(0, 'rgba(41, 128, 185, 0.9)'); wGrd.addColorStop(1, 'rgba(21, 67, 96, 0.95)');
+        ctx.fillStyle = wGrd; ctx.fillRect(wx + 3, y + 15, 22, 32); 
+        // Diagonal glass glare
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; 
+        ctx.beginPath(); ctx.moveTo(wx+3, y+15); ctx.lineTo(wx+25, y+15); ctx.lineTo(wx+3, y+47); ctx.fill();
     }
 
-    ctx.fillStyle = 'white'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center';
+    // Typography
+    ctx.fillStyle = 'white'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
     ctx.fillText("INDIAN RAILWAYS", x + W/2, y + 10);
     
-    ctx.fillStyle = '#ffd700'; ctx.fillRect(x, y, 3, H); ctx.fillRect(x + W - 3, y, 3, H);
+    // Inter-coach Connections (Rubber vestibules)
+    ctx.fillStyle = '#111'; ctx.fillRect(x - 5, y + 10, 5, H - 20); ctx.fillRect(x + W, y + 10, 5, H - 20);
+    ctx.fillStyle = '#f1c40f'; ctx.fillRect(x, y, 3, H); ctx.fillRect(x + W - 3, y, 3, H);
 }
 
-function drawBogie(x, y) { ctx.fillStyle = '#111'; ctx.fillRect(x, y + 2, 130, 28); drawWheel(x + 25, y + 24); drawWheel(x + 105, y + 24); }
-function drawWheel(x, y) { ctx.save(); ctx.translate(x, y); ctx.rotate(wheelRotation); ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(0, 0, 19, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+function drawBogie(x, y) { 
+    // Bogie Frame Highlights
+    ctx.fillStyle = '#34495e'; ctx.fillRect(x, y-2, 130, 8); // Top Frame
+    ctx.fillStyle = '#111'; ctx.fillRect(x+10, y + 2, 110, 28); // Main block
+    
+    // Central Suspension Coil Spring
+    ctx.fillStyle = '#f1c40f';
+    for(let s=0; s<4; s++) { ctx.fillRect(x+55, y+6+(s*5), 20, 4); }
+    
+    // Heavy Traction Motors (boxes between wheels)
+    ctx.fillStyle = '#2c3e50'; ctx.fillRect(x+25, y+6, 30, 18); ctx.fillRect(x+75, y+6, 30, 18);
+
+    drawWheel(x + 25, y + 24); drawWheel(x + 105, y + 24); 
+}
+
+function drawWheel(x, y) { 
+    ctx.save(); ctx.translate(x, y); ctx.rotate(wheelRotation); 
+    // Outer Steel Flange
+    ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.fill(); 
+    // Inner Dark Rim
+    ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI*2); ctx.fill(); 
+    // Wheel Axle Core
+    ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill(); 
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI*2); ctx.fill(); 
+    
+    // Spoke/Movement indicators
+    ctx.fillStyle = '#bdc3c7'; ctx.fillRect(-2, -15, 4, 30); ctx.fillRect(-15, -2, 30, 4);
+    ctx.restore(); 
+    
+    // Static Brake Pads (do not rotate)
+    ctx.fillStyle = '#d35400'; ctx.fillRect(x - 22, y - 5, 6, 12); 
+    ctx.fillRect(x + 16, y - 5, 6, 12); 
+}
 
 function drawTree(t) {
     let wind = Math.sin(Date.now()/1000 + t.sway) * 16;
-    let treeY = CONFIG.trackY + (t.layer === 0 ? 45 : t.layer === 1 ? 10 : 0);
-    let trunkH = t.h / (t.isPalm ? 2.5 : 4);
+    let treeY = CONFIG.trackY - 20 + (t.layer === 0 ? 15 : t.layer === 1 ? 5 : 0);
+    let trunkH = (t.h * 0.4) / (t.isPalm ? 2.5 : 4);
     ctx.fillStyle = '#2b1d0e'; ctx.fillRect(t.x + (t.isPalm ? 20 : 10), treeY, t.isPalm?10:20, -trunkH);
     if(t.isPalm) {
         ctx.fillStyle = '#0a1d0a'; ctx.save(); ctx.translate(t.x + 25, treeY - trunkH);
@@ -435,23 +714,83 @@ function drawTree(t) {
 
 function drawStationProcedural(x, name) {
     const pW = 7500; 
-    ctx.fillStyle = '#b33939'; ctx.beginPath(); ctx.moveTo(x-500, CONFIG.trackY-450); ctx.lineTo(x+100, CONFIG.trackY-600); ctx.lineTo(x+700, CONFIG.trackY-450); ctx.fill();
-    ctx.fillStyle = '#111'; ctx.fillRect(x-450, CONFIG.trackY-450, 1000, 380); 
+    
+    // Better 3D Platform Roof
+    let roofGrd = ctx.createLinearGradient(0, CONFIG.trackY-450, 0, CONFIG.trackY-300);
+    roofGrd.addColorStop(0, '#5a1f1f');
+    roofGrd.addColorStop(1, '#8b2e2e');
+    ctx.fillStyle = roofGrd;
+    ctx.fillRect(x - pW/2, CONFIG.trackY-450, pW, 150);
+    ctx.fillStyle = '#3a1313'; // Roof edge
+    ctx.fillRect(x - pW/2, CONFIG.trackY-300, pW, 10);
+    
+    // Platform Base
     ctx.fillStyle = '#222'; ctx.fillRect(x-pW/2, CONFIG.trackY-28, pW, 28);
-    ctx.fillStyle = '#ffd700'; ctx.fillRect(x-pW/2, CONFIG.trackY-22, pW, 3);
-    for(let k=0; k<12; k++) {
-        let sx = x - pW/2.5 + (k * 650);
-        ctx.fillStyle = '#2c3e50'; ctx.fillRect(sx, CONFIG.trackY-200, 300, 15);
-        ctx.fillStyle = '#333'; ctx.fillRect(sx, CONFIG.trackY-200, 8, 172); ctx.fillRect(sx+292, CONFIG.trackY-200, 8, 172);
-        ctx.fillStyle = '#f39c12'; ctx.fillRect(sx+80, CONFIG.trackY-55, 140, 10); ctx.fillRect(sx+80, CONFIG.trackY-75, 140, 5);
-        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(sx+120, CONFIG.trackY-90, 7, 0, Math.PI*2); ctx.fill(); ctx.fillRect(sx+112, CONFIG.trackY-84, 16, 20);
-        ctx.beginPath(); ctx.arc(sx+180, CONFIG.trackY-90, 7, 0, Math.PI*2); ctx.fill(); ctx.fillRect(sx+172, CONFIG.trackY-84, 16, 20);
+    ctx.fillStyle = '#ffd700'; ctx.fillRect(x-pW/2, CONFIG.trackY-22, pW, 3); // Safety line
+    
+    // Hindi translation placeholder
+    let hindiName = "भारतीय रेल"; 
+    
+    // Pillars and details distributed across length
+    for(let k=0; k<25; k++) {
+        let sx = x - pW/2.5 + (k * 400);
+        
+        // Steel Pillars
+        ctx.fillStyle = '#7f8c8d'; 
+        ctx.fillRect(sx, CONFIG.trackY-300, 15, 272); 
+        
+        // Digital LED indicators hanging from roof
+        if (k % 2 === 0) {
+            ctx.fillStyle = '#111'; ctx.fillRect(sx - 40, CONFIG.trackY-280, 100, 30);
+            ctx.fillStyle = '#ff3333'; ctx.font = 'bold 12px monospace'; ctx.fillText('ETA 05 MIN', sx + 10, CONFIG.trackY-260);
+        }
+        
+        // Authentic Station Display Board
+        if (k % 5 === 1) {
+            ctx.fillStyle = '#111'; ctx.fillRect(sx + 10, CONFIG.trackY-200, 10, 100); // Posts
+            ctx.fillRect(sx + 180, CONFIG.trackY-200, 10, 100);
+            
+            ctx.fillStyle = '#ffcc00'; ctx.fillRect(sx, CONFIG.trackY-200, 200, 80); // Classic yellow board
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.strokeRect(sx, CONFIG.trackY-200, 200, 80);
+            
+            ctx.fillStyle = '#000'; 
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 20px Arial'; ctx.fillText(name, sx + 100, CONFIG.trackY-150); // English
+            ctx.font = 'bold 14px Arial'; ctx.fillText(hindiName, sx + 100, CONFIG.trackY-175); // Hindi
+        }
+        
+        // Benches and Stalls
+        if (k % 3 === 0) {
+            // Purple Bench
+            ctx.fillStyle = '#8e44ad'; ctx.fillRect(sx + 50, CONFIG.trackY-60, 60, 30);
+            ctx.fillStyle = '#6c3483'; ctx.fillRect(sx + 50, CONFIG.trackY-60, 60, 8);
+            // Person on bench
+            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(sx + 80, CONFIG.trackY-75, 10, 0, Math.PI*2); ctx.fill();
+            ctx.fillRect(sx + 75, CONFIG.trackY-65, 10, 20);
+        } else if (k % 7 === 0) {
+            // Small Book Stall (A.H Wheeler style)
+            ctx.fillStyle = '#d35400'; ctx.fillRect(sx + 50, CONFIG.trackY-100, 120, 72);
+            ctx.fillStyle = '#2c3e50'; ctx.fillRect(sx + 45, CONFIG.trackY-100, 130, 20); // Awning
+            ctx.fillStyle = '#ecf0f1'; ctx.font = 'bold 12px Arial'; ctx.fillText('A.H WHEELER', sx + 110, CONFIG.trackY-85);
+            ctx.fillStyle = '#f1c40f'; ctx.fillRect(sx + 60, CONFIG.trackY-60, 100, 30); // Counter
+        }
     }
-    ctx.fillStyle = '#000';
-    for(let j=0; j<35; j++) { let px = x - pW/2.2 + (j*210+Math.sin(j)*120); ctx.beginPath(); ctx.arc(px, CONFIG.trackY-75, 8, 0, Math.PI*2); ctx.fill(); ctx.fillRect(px-8, CONFIG.trackY-67, 16, 28); }
-    ctx.fillStyle = '#b33939'; ctx.fillRect(x+800, CONFIG.trackY-140, 250, 110);
-    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center'; ctx.fillText(name, x, CONFIG.trackY-125);
-    ctx.fillStyle = '#0f0'; ctx.fillRect(x+415, CONFIG.trackY-100, 35, 25);
+    
+    // Dynamic Crowd (animated shadow silhouettes based on time)
+    ctx.fillStyle = '#1a1a1a';
+    for(let j=0; j<80; j++) { 
+        let walkOffset = Math.sin((Date.now()/500) + j) * 20; 
+        let px = x - pW/2.2 + (j*130) + walkOffset; 
+        
+        // Head
+        ctx.beginPath(); ctx.arc(px, CONFIG.trackY-75, 8, 0, Math.PI*2); ctx.fill(); 
+        // Body
+        ctx.fillRect(px-8, CONFIG.trackY-67, 16, 28); 
+        // Legs (animated swinging)
+        let legSwing = Math.sin(Date.now()/200 + j)*6;
+        ctx.fillRect(px-4 + legSwing, CONFIG.trackY-39, 4, 15);
+        ctx.fillRect(px+2 - legSwing, CONFIG.trackY-39, 4, 15);
+    }
 }
 
 function drawOHELines() { 
@@ -460,7 +799,7 @@ function drawOHELines() {
     for(let i=-450; i<canvas.width+450; i+=450) { let px = i-poleOffset; ctx.fillStyle = '#222'; ctx.fillRect(px, CONFIG.trackY-370, 15, 370); } 
 }
 
-function drawMainTrack() { let offset = bgX % 85; ctx.fillStyle = '#3e2723'; for(let i=-100; i<canvas.width+120; i+=85) ctx.fillRect(i-offset, CONFIG.trackY-11, 35, 22); ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(0, CONFIG.trackY-6); ctx.lineTo(canvas.width, CONFIG.trackY-6); ctx.moveTo(0, CONFIG.trackY+6); ctx.lineTo(canvas.width, CONFIG.trackY+6); ctx.stroke(); }
+function drawMainTrack() { let offset = bgX % 40; ctx.fillStyle = "#444"; ctx.fillRect(0, CONFIG.trackY, canvas.width, 8); for(let i=-40; i<canvas.width+40; i+=40) { ctx.fillStyle = "#6b4f3b"; ctx.fillRect(i-offset, CONFIG.trackY, 20, 6); } ctx.fillStyle = "#aaa"; ctx.fillRect(0, CONFIG.trackY - 2, canvas.width, 2); }
 function drawForegroundGrass() { let offset = (bgX * 2.5) % 400; ctx.fillStyle = '#0a1d0a'; for(let i=-400; i<canvas.width+400; i+=250) ctx.fillRect(i-offset, canvas.height-80, 80, 80); }
 
 function drawMegaBridge(x, width) {

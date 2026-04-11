@@ -27,7 +27,12 @@ body {
 #gameCanvas {
     display: block;
     width: 100%;
-    height: 100%;
+    height: 70vh;
+}
+
+canvas {
+    width: 100%;
+    height: 70vh;
 }
 
 /* 🎙️ ALP HUD */
@@ -89,14 +94,17 @@ body {
 
 /* 🕹️ COCKPIT UI - STABLE ORIGIN (V151.14) */
 #cockpit-ui {
-    position: absolute;
+    position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
+    height: 30vh;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow: hidden;
     background: linear-gradient(to top, rgba(0,0,0,1), rgba(0,0,0,0.8));
     border-top: 2px solid #333;
     padding: 30px 50px;
-    display: flex;
     justify-content: space-between;
     align-items: center;
     z-index: 10;
@@ -105,7 +113,19 @@ body {
 
 .stat-group {
     text-align: center;
-    min-width: 200px;
+    min-width: 150px;
+    flex-shrink: 0;
+}
+
+.speed-container {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto;
+}
+
+#speedCanvas {
+    width: 100%;
+    height: 100%;
 }
 
 #speed-display {
