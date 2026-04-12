@@ -175,22 +175,29 @@ button {
 }
 
 /* 📱 SURGICAL MOBILE AUTO-ADAPT (V151.13) */
-/* 📱 SURGICAL MOBILE AUTO-ADAPT (V151.16 - DYNAMIC ZOOM) */
+/* 📱 DYNAMIC MOBILE ADAPT (V151.20 - SVH SUPPORT) */
 @media (max-width: 900px) {
     #alp-hud { top: 10px; left: 10px; }
+    
+    /* Dedicated Landscape Fix */
+    @media (orientation: landscape) {
+        #gameCanvas, canvas { height: calc(100svh - 140px); }
+        #cockpit-ui { height: 140px; }
+    }
+
     #cockpit-ui { 
         padding: 10px 15px; 
         flex-direction: row; 
         flex-wrap: wrap;
         justify-content: space-around;
-        height: auto; /* Height now managed by Scale */
+        gap: 10px;
     }
-    .stat-group { min-width: 100px; flex: 0; order: 1; }
-    #speed-display { font-size: 2.8rem; }
-    .control-group { order: 2; width: 45%; gap: 15px; margin: 0; }
-    .lever-wrapper label { font-size: 0.6rem; margin-bottom: 5px; }
-    .button-strip { order: 3; width: 40%; gap: 8px; flex-direction: column; }
-    button { padding: 8px 12px; font-size: 0.6rem; }
+    .stat-group { min-width: 80px; flex: 0; order: 1; }
+    #speed-display { font-size: 2rem; }
+    .control-group { order: 2; width: 40%; gap: 10px; margin: 0; }
+    .lever-wrapper label { font-size: 0.5rem; margin-bottom: 2px; }
+    .button-strip { order: 3; width: 35%; gap: 5px; flex-direction: column; }
+    button { padding: 6px 10px; font-size: 0.55rem; }
 }
 
 /* 📱 ORIENTATION LOGIC (V151.11) */

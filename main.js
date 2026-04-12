@@ -241,7 +241,8 @@ function update() {
     mountains.forEach(m => { m.x -= speed * 0.12; if(m.x < -2000) m.x = canvas.width + 1000; });
     trees.forEach((t, i) => { t.x -= speed * (t.layer === 0 ? 6.5 : t.layer === 1 ? 4.8 : 2.2); if(t.x < -1500) trees.splice(i,1); });
     if(Math.random() < 0.2) spawnTreeLayered();
-    clouds.forEach(c => { c.x -= speed * (c.layer === 0 ? 0.05 : 0.15); if(c.x < -600) c.x = canvas.width + 600; });
+    // Unified Background Velocity (Locked at 0.72 to match 4.8 * 0.15 parallax)
+    clouds.forEach(c => { c.x -= speed * 0.72; if(c.x < -600) c.x = canvas.width + 600; });
 
     // 🔥 DYNAMIC PARTICLE PHYSICS
     if (throttle > 0.7 && speed > 2 && Math.random() < 0.2) {
@@ -294,63 +295,156 @@ function draw() {
     
     let skyGrd = ctx.createLinearGradient(0,0,0,CONFIG.trackY);
     if(isSunset) {
-        skyGrd.addColorStop(0, `hsl(280, 50%, 30%)`);
-        skyGrd.addColorStop(1, `hsl(15, 80%, 45%)`);
+        skyGrd.addColorStop(0, '#2c3e50'); // Deep sunset blue
+        skyGrd.addColorStop(0.5, '#e67e22'); // Orange horizon
+        skyGrd.addColorStop(1, '#f39c12'); // Gold
     } else {
-        skyGrd.addColorStop(0, `hsl(210, 45%, ${skyBrightRaw * (isRaining ? 0.6 : 1)}%)`);
-        skyGrd.addColorStop(1, `hsl(210, 60%, ${skyBrightRaw * (isRaining ? 0.6 : 1) + 15}%)`);
+        // Vibrant Sky Blue to match assets
+        skyGrd.addColorStop(0, `hsl(210, 80%, ${skyBrightRaw * (isRaining ? 0.6 : 1)}%)`); 
+        skyGrd.addColorStop(1, `hsl(200, 90%, ${skyBrightRaw * (isRaining ? 0.6 : 1) + 20}%)`);
     }
     ctx.fillStyle = skyGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // (Celestial bodies moved to after sky parallax for depth correction)
+
+    // Parallax Layer 1: Unified Sky (Locked to ground velocity for "One Physical Structure" feel)
+    if(imgSky.complete && imgSky.width > 0) {
+        let skyFactor = 0.15; // 🔗 LOCKED to mountain/city speed
+        let skyOff = (bgX * skyFactor) % imgSky.width;
+        ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
+        
+        // Robust Tiling Loop (Math.ceil + 5px overlap to kill all seams)
+        let startX = -skyOff;
+        let tW = Math.ceil(imgSky.width);
+        while(startX < canvas.width) {
+            ctx.drawImage(imgSky, startX, 0, tW + 5, CONFIG.trackY); 
+            startX += tW;
+        }
+        ctx.globalAlpha = 1.0;
+    }
+
+    // 🌙 CELESTIAL REALITY ENGINE (Stars & Volumetric Moon)
     if (starOp > 0) {
+        const moonX = canvas.width - 300;
+        const moonY = 180;
+        const moonRad = 50;
+
+        // 1. Stars (Blinking background)
         ctx.fillStyle = 'rgba(255, 255, 255, 1)';
         stars.forEach(s => {
             ctx.beginPath(); ctx.globalAlpha = s.a * starOp; ctx.arc(s.x, s.y, s.s, 0, Math.PI*2); ctx.fill();
         });
-        ctx.globalAlpha = 1.0;
-        // Moon
-        ctx.fillStyle = `rgba(255, 255, 220, ${starOp})`; ctx.beginPath(); ctx.arc(canvas.width - 300, 180, 50, 0, Math.PI*2); ctx.fill();
-    }
 
-    // Parallax Layer 1: Sky
-    if(imgSky.complete && imgSky.width > 0) {
-        let skyOff = (bgX * 0.02) % imgSky.width;
-        // Draw sky highly opaque to hide old geometric shapes/gradient completely
-        ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
-        ctx.drawImage(imgSky, -skyOff, 0, imgSky.width, CONFIG.trackY);
-        ctx.drawImage(imgSky, imgSky.width - skyOff, 0, imgSky.width, CONFIG.trackY);
+        // 2. Volumetric Moon (Radial Glow Halo)
+        let haloGrd = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, moonRad * 3);
+        haloGrd.addColorStop(0, `rgba(255, 255, 240, ${starOp})`);
+        haloGrd.addColorStop(0.2, `rgba(255, 250, 200, ${starOp * 0.8})`);
+        haloGrd.addColorStop(0.5, `rgba(255, 255, 255, ${starOp * 0.3})`);
+        haloGrd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
         ctx.globalAlpha = 1.0;
+        ctx.fillStyle = haloGrd;
+        ctx.beginPath(); ctx.arc(moonX, moonY, moonRad * 3, 0, Math.PI*2); ctx.fill();
+
+        // Solid Moon Core
+        ctx.fillStyle = `rgba(255, 255, 230, ${starOp})`;
+        ctx.beginPath(); ctx.arc(moonX, moonY, moonRad, 0, Math.PI*2); ctx.fill();
     }
 
     clouds.forEach(c => {
-        let cBright = isNight ? 50 : 255;
-        ctx.fillStyle = `rgba(${cBright}, ${cBright}, ${cBright + (isSunset? -50 : 0)}, ${c.op * 2.5})`;
-        for(let j=0; j<5; j++) ctx.beginPath(), ctx.arc(c.x + (j-2)*(c.sz/4), c.y + Math.sin(j)*15, c.sz/2, 0, Math.PI*2), ctx.fill();
+        let moonX = canvas.width - 300, moonY = 180;
+        let distToMoon = Math.sqrt(Math.pow(c.x - moonX, 2) + Math.pow(c.y - moonY, 2));
+        let isNearMoon = distToMoon < 400;
+
+        let baseAlpha = c.op * 2.5;
+        if (isNearMoon && isNight) baseAlpha *= 1.5; // Silver lining glow
+
+        let cColor;
+        if (isNight) cColor = isNearMoon ? `rgba(220, 220, 255, ${baseAlpha})` : `rgba(80, 80, 95, ${baseAlpha})`;
+        else if (isSunset) cColor = `rgba(255, 200, 150, ${baseAlpha})`;
+        else cColor = `rgba(240, 248, 255, ${baseAlpha})`;
+
+        for(let j=0; j<5; j++) {
+            let cx = c.x + (j-2)*(c.sz/4);
+            let cy = c.y + Math.sin(j)*15;
+            let rad = c.sz/2;
+            
+            let grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+            grd.addColorStop(0, cColor);
+            grd.addColorStop(0.7, cColor);
+            grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI*2); ctx.fill();
+        }
     });
 
     // Parallax Layer 2: Biome Mountains/City
     let currentParallax = distKM > 100 ? imgCity : imgMountains;
-    if(currentParallax.complete && currentParallax.width > 0) {
-        let pW = canvas.width * 1.5;
-        let pOff = (bgX * 0.15) % pW;
-        
-        if(isNight) ctx.filter = 'brightness(30%)';
-        else if(isSunset) ctx.filter = 'brightness(60%) sepia(40%) hue-rotate(-20deg)';
-
-        // Crop the top 45% of the AI image to eliminate the fake checkerboard transparency
+    if(currentParallax && currentParallax.complete && currentParallax.width > 0) {
+        // --- UNIFIED ATMOSPHERE ENGINE (Atmospheric Fusion) ---
         let cutY = currentParallax.height * 0.45;
         let sH = currentParallax.height - cutY;
-        let destH = 500; // Stretch vertically to meet the track
-        
-        ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, -pOff, CONFIG.trackY - destH, pW, destH);
-        ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, pW - pOff, CONFIG.trackY - destH, pW, destH);
-        ctx.filter = 'none';
+        let pW = Math.max(canvas.width * 1.5, 1200); 
+        let worldMultiplier = 0.15;
+        let pOff = (bgX * worldMultiplier) % pW;
+        let destH = canvas.height * 0.55; 
+        let horizonY = CONFIG.trackY - destH + 20;
+
+        // 🌫️ 1. HORIZON HAZE BRIDGE (Refined Transparency for Reality)
+        let hazeGrd = ctx.createLinearGradient(0, horizonY - 60, 0, horizonY + 40);
+        hazeGrd.addColorStop(0, 'rgba(0,0,0,0)');
+        hazeGrd.addColorStop(0.5, isSunset ? 'rgba(255, 160, 80, 0.3)' : 'rgba(200, 235, 255, 0.35)');
+        hazeGrd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = hazeGrd; ctx.fillRect(0, horizonY - 60, canvas.width, 100);
+
+        ctx.save();
+        // 🎨 2. DYNAMIC HUE-MATCHING (Color Sync)
+        if(isNight) ctx.filter = 'brightness(35%) contrast(110%) hue-rotate(10deg)';
+        else if(isSunset) ctx.filter = 'brightness(75%) sepia(50%) saturate(140%) hue-rotate(-15deg)';
+        else ctx.filter = 'brightness(68%) contrast(90%) saturate(80%) sepia(20%) hue-rotate(-5deg)';
+
+        // ⛰️ 3. TILING WITH EDGE FEATHERING
+        let mountainX = -pOff;
+        let tileWidth = Math.ceil(pW);
+        while(mountainX < canvas.width) {
+            // Main image
+            ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, mountainX, horizonY, tileWidth + 5, destH);
+            mountainX += tileWidth;
+        }
+        ctx.restore();
+
+        // 🌟 4. RIM LIGHTING BLOOM (Light Bleed over peaks)
+        ctx.globalCompositeOperation = 'lighter';
+        let bloomGrd = ctx.createLinearGradient(0, horizonY - 40, 0, horizonY + 20);
+        bloomGrd.addColorStop(0, isSunset ? 'rgba(255, 120, 0, 0.35)' : 'rgba(180, 220, 255, 0.45)');
+        bloomGrd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = bloomGrd; 
+        ctx.fillRect(0, horizonY - 40, canvas.width, 60);
+        ctx.globalCompositeOperation = 'source-over';
+
+        // 🌫️ 5. TOP-EDGE FEATHER (Erasing the sharp cutout line)
+        let featherGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 45);
+        featherGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.2)' : 'rgba(200, 230, 255, 0.25)');
+        featherGrd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = featherGrd; ctx.fillRect(0, horizonY, canvas.width, 45);
+
+        // ⚓ 6. GROUND ANCHORING
+        let anchorGrd = ctx.createLinearGradient(0, CONFIG.trackY - 100, 0, CONFIG.trackY);
+        anchorGrd.addColorStop(0, 'rgba(0,0,0,0)');
+        anchorGrd.addColorStop(1, 'rgba(0,0,0,0.6)');
+        ctx.fillStyle = anchorGrd; ctx.fillRect(0, CONFIG.trackY-100, canvas.width, 100);
 
         if(distKM > 100 && isNight) {
             ctx.fillStyle = 'rgba(255,200,100,0.8)';
-            let winOff = (bgX * 0.15) % pW;
-            for(let w=0; w<40; w++) {
-                ctx.fillRect( (w*150 - winOff + pW)%pW, CONFIG.trackY - 150 - Math.random()*200, 6, 6 );
+            let winOff = (bgX * worldMultiplier) % pW;
+            let winX = -winOff;
+            while(winX < canvas.width) {
+                for(let w=0; w<20; w++) {
+                    ctx.fillRect( winX + (w*150)%pW, horizonY + 60 + Math.random()*150, 4, 4 );
+                }
+                winX += pW;
             }
         }
     }
@@ -401,13 +495,13 @@ function draw() {
         });
     }
 
-    // Foreground High-Speed Overlay
+    // Foreground High-Speed Overlay (Lowered to clear train wheels)
     foregroundObjects.forEach(f => {
         if(f.isPole) {
-            ctx.fillStyle = '#222'; ctx.fillRect(f.x, CONFIG.trackY - 120, 20, canvas.height);
-            ctx.fillStyle = '#ff3333'; ctx.fillRect(f.x - 5, CONFIG.trackY - 80, 30, 30);
+            ctx.fillStyle = '#222'; ctx.fillRect(f.x, CONFIG.trackY + 10, 20, canvas.height);
+            ctx.fillStyle = '#ff3333'; ctx.fillRect(f.x - 5, CONFIG.trackY + 20, 30, 30);
         } else {
-            ctx.fillStyle = '#0f2f0f'; ctx.beginPath(); ctx.arc(f.x, canvas.height - 20, 80, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#0f2f0f'; ctx.beginPath(); ctx.arc(f.x, canvas.height + 40, 100, 0, Math.PI*2); ctx.fill();
         }
     });
 
@@ -806,7 +900,7 @@ function drawMegaBridge(x, width) {
     ctx.fillStyle = '#002b4d'; ctx.fillRect(0, CONFIG.trackY+10, canvas.width, canvas.height); ctx.save(); ctx.translate(x, 0);
     for(let k=0; k<6; k++) { let hx = 600 + k*1400; ctx.fillStyle = '#4e342e'; ctx.fillRect(hx, CONFIG.trackY+60, 220, 70); ctx.fillStyle = '#d7ccc8'; ctx.fillRect(hx+20, CONFIG.trackY+15, 180, 50); ctx.fillStyle = '#111'; ctx.fillRect(hx+40, CONFIG.trackY+25, 30, 20); }
     for(let i=0; i<Math.floor(width/650); i++) { let px = i*650; ctx.fillStyle = '#1a1a1a'; ctx.fillRect(px, CONFIG.trackY+10, 120, canvas.height); ctx.fillStyle = '#0a0a0a'; ctx.beginPath(); ctx.moveTo(px+120, CONFIG.trackY+10); ctx.quadraticCurveTo(px+380, CONFIG.trackY+220, px+600, CONFIG.trackY+10); ctx.fill(); }
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 12;
+    ctx.strokeStyle = 'rgba(50, 50, 50, 0.7)'; ctx.lineWidth = 6;
     for(let i=0; i<Math.floor(width/900); i++) {
         let tx = i*900; ctx.strokeRect(tx, CONFIG.trackY-480, 900, 480);
         ctx.beginPath(); ctx.moveTo(tx, CONFIG.trackY-480); ctx.lineTo(tx+450, CONFIG.trackY); ctx.lineTo(tx+900, CONFIG.trackY-480); ctx.stroke();
