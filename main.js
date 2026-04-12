@@ -492,22 +492,20 @@ function draw() {
             ctx.stroke();
         });
 
-        // 🌟 4. RIM LIGHTING BLOOM (Deep Gap - EXPANDED)
+        // 🌟 4. RIM LIGHTING BLOOM (Balanced Glow)
         ctx.globalCompositeOperation = 'lighter';
-        let bloomGrd = ctx.createLinearGradient(0, horizonY - 150, 0, horizonY + 80);
-        bloomGrd.addColorStop(0, isSunset ? 'rgba(255, 120, 0, 0.45)' : 'rgba(180, 220, 255, 0.5)');
-        bloomGrd.addColorStop(0.4, isSunset ? 'rgba(255, 120, 0, 0.2)' : 'rgba(180, 220, 255, 0.25)');
+        let bloomGrd = ctx.createLinearGradient(0, horizonY - 80, 0, horizonY + 40);
+        bloomGrd.addColorStop(0, isSunset ? 'rgba(255, 120, 0, 0.2)' : 'rgba(180, 220, 255, 0.25)');
         bloomGrd.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = bloomGrd; 
-        ctx.fillRect(0, horizonY - 150, canvas.width, 230);
+        ctx.fillRect(0, horizonY - 80, canvas.width, 120);
         ctx.globalCompositeOperation = 'source-over';
 
-        // 🌫️ 5. ATMOSPHERIC FEATHER (Deep Gap - 350px Triple Layer)
-        let featherGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 350);
-        featherGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.5)' : 'rgba(200, 230, 255, 0.55)');
-        featherGrd.addColorStop(0.3, isSunset ? 'rgba(200, 100, 50, 0.2)' : 'rgba(200, 230, 255, 0.2)');
+        // 🌫️ 5. ATMOSPHERIC FEATHER (Soft Horizon Balanced)
+        let featherGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 150);
+        featherGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.2)' : 'rgba(200, 230, 255, 0.2)');
         featherGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = featherGrd; ctx.fillRect(0, horizonY, canvas.width, 350);
+        ctx.fillStyle = featherGrd; ctx.fillRect(0, horizonY, canvas.width, 150);
 
         // ⚓ 6. GROUND ANCHORING
         let anchorGrd = ctx.createLinearGradient(0, CONFIG.trackY - 100, 0, CONFIG.trackY);
