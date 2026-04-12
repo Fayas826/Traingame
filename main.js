@@ -17,7 +17,7 @@ const CONFIG = {
 };
 
 let canvas, ctx, speedCanvas, sctx, speed = 0, worldDistance = 0, bgX = 0, throttle = 0, brake = 0;
-let trees = [], clouds = [], rainDrops = [], foregroundObjects = [], mountains = [], stars = [], birds = [], shootingStars = [];
+let trees = [], clouds = [], rainDrops = [], foregroundObjects = [], mountains = [], stars = [];
 let stations = [], signals = [], coachOffsets = [];
 let timeOfDay = 0, wheelRotation = 0; 
 let audioStarted = false, hornAudio, locoAudio, slowTrackAudio, fastTrackAudio, crowdAudio;
@@ -129,17 +129,7 @@ function resize() {
 const sc = (val) => val * CONFIG.vScale;
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
-function spawnVolumetricCloud(x) { 
-    let altitude = 0.05 + Math.random() * 0.35; // Vertical position
-    let speedMult = 0.5 + (altitude * 1.5); // Higher = Slower parallax
-    clouds.push({ x, y: canvas.height * altitude, sz: sc(200)+Math.random()*sc(300), op: 0.08 + Math.random()*0.12, speedMult }); 
-}
-function spawnShootingStar() {
-    shootingStars.push({ x: Math.random()*canvas.width, y: Math.random()*(canvas.height*0.3), vx: 15+Math.random()*15, vy: 5+Math.random()*5, life: 1.0 });
-}
-function spawnBird() {
-    birds.push({ x: canvas.width + 100, y: 50 + Math.random()*150, s: 2 + Math.random()*2, vx: -1.5 - Math.random(), phase: Math.random()*Math.PI*2 });
-}
+function spawnVolumetricCloud(x) { clouds.push({ x, y: Math.random()*(canvas.height * 0.4), sz: sc(200)+Math.random()*sc(200), op: 0.05 + Math.random()*0.1, layer: (Math.random()*2)|0 }); }
 function isAtStation(xWorld) { return stations.some(s => Math.abs(xWorld - s.x) < 5000); }
 
 function spawnTreeLayered() {
@@ -202,17 +192,9 @@ function update() {
         if (f.x < -200) foregroundObjects.splice(index, 1); 
     });
 
-    // 🦅 4. DISTANT BIRDS (Parallax Life)
-    if(Math.random() < 0.005) spawnBird();
-    birds.forEach((b, idx) => {
-        b.x += b.vx; b.phase += 0.2;
-        if(b.x < -100) birds.splice(idx, 1);
-    });
-
-    // ☁️ 3. VOLUMETRIC CLOUD DRIFT (Altitude-based Parallax)
     clouds.forEach((c, index) => {
-        c.x -= speed * 0.1 * (c.speedMult || 1.0);
-        if (c.x < -c.sz * 2) {
+        c.x -= speed * 0.1;
+        if (c.x < -c.sz) {
             clouds.splice(index, 1);
             spawnVolumetricCloud(canvas.width + c.sz);
         }
@@ -327,38 +309,20 @@ function draw() {
     let starOp = isNight ? 1 : (isSunset ? 0.3 : 0);
     let skyGrd = ctx.createLinearGradient(0,0,0,CONFIG.trackY);
     if(isSunset) {
-        skyGrd.addColorStop(0, '#1a2a3a'); // Deep Space Night
-        skyGrd.addColorStop(0.3, '#2c3e50'); // Deep sunset blue
-        skyGrd.addColorStop(0.7, '#e67e22'); // Orange Rayleigh scattering
-        skyGrd.addColorStop(1, '#f39c12'); // Golden horizon
+        skyGrd.addColorStop(0, '#2c3e50'); // Deep sunset blue
+        skyGrd.addColorStop(0.5, '#e67e22'); // Orange horizon
+        skyGrd.addColorStop(1, '#f39c12'); // Gold
     } else {
-        // High-Fidelity Rayleigh Scattering Model
-        let b = skyBrightRaw * (isRaining ? 0.6 : 1);
-        skyGrd.addColorStop(0, `hsl(215, 75%, ${b * 0.7}%)`); // 1. Deep Space Zenith
-        skyGrd.addColorStop(0.4, `hsl(210, 80%, ${b}%)`);     // 2. High Atmosphere
-        skyGrd.addColorStop(0.75, `hsl(195, 85%, ${b + 15}%)`); // 3. Lower Scattering
-        skyGrd.addColorStop(1, `hsl(190, 90%, ${b + 25}%)`);    // 4. Horizon Haze
+        // Vibrant Sky Blue to match assets
+        skyGrd.addColorStop(0, `hsl(210, 80%, ${skyBrightRaw * (isRaining ? 0.6 : 1)}%)`); 
+        skyGrd.addColorStop(1, `hsl(200, 90%, ${skyBrightRaw * (isRaining ? 0.6 : 1) + 20}%)`);
     }
     ctx.fillStyle = skyGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // --- 2. CELESTIAL VOLUMETRICS (Sun Rays / God Rays) ---
-    if(!isNight) {
-        let sunX = canvas.width * 0.8, sunY = 150;
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        for(let i=0; i<6; i++) {
-            let angle = (timeOfDay * 0.01) + (i * Math.PI / 3);
-            let rayGrd = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, canvas.width * 0.8);
-            rayGrd.addColorStop(0, isSunset ? 'rgba(255, 100, 0, 0.15)' : 'rgba(255, 255, 200, 0.1)');
-            rayGrd.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = rayGrd;
-            ctx.beginPath();
-            ctx.moveTo(sunX, sunY);
-            ctx.arc(sunX, sunY, canvas.width, angle, angle + 0.2);
-            ctx.fill();
-        }
-        ctx.restore();
+        // (God-rays and birds removed to match image)
     }
+
+    // Parallax Layer 1: Unified Sky (Safe 'Long-Cloth' Tiling)
     if(imgSky.complete && imgSky.width > 0) {
         let skyFactor = 0.15; 
         let skyOff = (bgX * skyFactor) % imgSky.width;
@@ -412,31 +376,27 @@ function draw() {
         if(Math.random() < 0.005) spawnShootingStar();
     }
 
-    // --- 3. VOLUMETRIC CLOUD STACKING ENGINE (Puffy Realism) ---
     clouds.forEach(c => {
         let moonX = canvas.width - 300, moonY = 180;
         let distToMoon = Math.sqrt(Math.pow(c.x - moonX, 2) + Math.pow(c.y - moonY, 2));
         let isNearMoon = distToMoon < 400;
 
-        let baseAlpha = c.op;
-        if (isNearMoon && isNight) baseAlpha *= 2.0; 
+        let baseAlpha = c.op * 2.5;
+        if (isNearMoon && isNight) baseAlpha *= 1.5; // Silver lining glow
 
         let cColor;
-        if (isNight) cColor = isNearMoon ? `rgba(220, 220, 255, ${baseAlpha})` : `rgba(100, 100, 115, ${baseAlpha})`;
-        else if (isSunset) cColor = `rgba(255, 180, 130, ${baseAlpha})`;
-        else cColor = `rgba(255, 255, 255, ${baseAlpha})`;
+        if (isNight) cColor = isNearMoon ? `rgba(220, 220, 255, ${baseAlpha})` : `rgba(80, 80, 95, ${baseAlpha})`;
+        else if (isSunset) cColor = `rgba(255, 200, 150, ${baseAlpha})`;
+        else cColor = `rgba(240, 248, 255, ${baseAlpha})`;
 
-        // Puff Stacking Pass (12-puff density for 'fluffy' edges)
-        for(let j=0; j<12; j++) {
-            let offsetAngle = (j / 12) * Math.PI * 2;
-            let dist = (j/12) * (c.sz * 0.4);
-            let cx = c.x + Math.cos(offsetAngle) * dist;
-            let cy = c.y + Math.sin(offsetAngle) * dist * 0.4; // Flattened puffs
-            let rad = c.sz * (0.6 + Math.random() * 0.4);
+        for(let j=0; j<5; j++) {
+            let cx = c.x + (j-2)*(c.sz/4);
+            let cy = c.y + Math.sin(j)*15;
+            let rad = c.sz/2;
             
             let grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
             grd.addColorStop(0, cColor);
-            grd.addColorStop(0.5, cColor);
+            grd.addColorStop(0.7, cColor);
             grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
             
             ctx.globalAlpha = 1.0;
@@ -479,33 +439,6 @@ function draw() {
             mountainX += tileWidth;
         }
         ctx.restore();
-
-        // 🦅 6. DISTANT BIRD RENDER
-        birds.forEach(b => {
-            ctx.strokeStyle = `rgba(0, 0, 0, 0.4)`;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            let wing = Math.sin(b.phase) * 3;
-            ctx.moveTo(b.x - b.s, b.y + wing);
-            ctx.lineTo(b.x, b.y);
-            ctx.lineTo(b.x + b.s, b.y + wing);
-            ctx.stroke();
-        });
-
-        // 🌟 4. RIM LIGHTING BLOOM (Balanced Glow)
-        ctx.globalCompositeOperation = 'lighter';
-        let bloomGrd = ctx.createLinearGradient(0, horizonY - 80, 0, horizonY + 40);
-        bloomGrd.addColorStop(0, isSunset ? 'rgba(255, 120, 0, 0.2)' : 'rgba(180, 220, 255, 0.25)');
-        bloomGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = bloomGrd; 
-        ctx.fillRect(0, horizonY - 80, canvas.width, 120);
-        ctx.globalCompositeOperation = 'source-over';
-
-        // 🌫️ 5. ATMOSPHERIC FEATHER (Soft Horizon Balanced)
-        let featherGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 150);
-        featherGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.2)' : 'rgba(200, 230, 255, 0.2)');
-        featherGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = featherGrd; ctx.fillRect(0, horizonY, canvas.width, 150);
 
         // ⚓ 6. GROUND ANCHORING
         let anchorGrd = ctx.createLinearGradient(0, CONFIG.trackY - 100, 0, CONFIG.trackY);
