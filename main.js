@@ -120,17 +120,17 @@ function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight * 0.7;
     
-    // 🎨 MOBILE ADAPTIVE ENGINE
+    // 🎨 MOBILE ADAPTIVE ENGINE (Aggressive 60% Scaling)
     const isMobileLocal = canvas.height < 500;
-    CONFIG.vScale = isMobileLocal ? 0.72 : 1.0;
-    CONFIG.trackY = isMobileLocal ? canvas.height * 0.78 : canvas.height * 0.85;
+    CONFIG.vScale = isMobileLocal ? 0.60 : 1.0;
+    CONFIG.trackY = isMobileLocal ? canvas.height * 0.70 : canvas.height * 0.85;
 }
 
 // 📏 Scaling Helper
 const sc = (val) => val * CONFIG.vScale;
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
-function spawnVolumetricCloud(x) { clouds.push({ x, y: Math.random()*250, sz: 200+Math.random()*200, op: 0.05 + Math.random()*0.1, layer: (Math.random()*2)|0 }); }
+function spawnVolumetricCloud(x) { clouds.push({ x, y: Math.random()*(canvas.height * 0.4), sz: sc(200)+Math.random()*sc(200), op: 0.05 + Math.random()*0.1, layer: (Math.random()*2)|0 }); }
 function isAtStation(xWorld) { return stations.some(s => Math.abs(xWorld - s.x) < 5000); }
 
 function spawnTreeLayered() {
@@ -392,20 +392,18 @@ function draw() {
     let currentParallax = distKM > 100 ? imgCity : imgMountains;
     if(currentParallax && currentParallax.complete && currentParallax.width > 0) {
         // --- UNIFIED ATMOSPHERE ENGINE (Atmospheric Fusion) ---
-        let cutY = currentParallax.height * 0.45;
-        let sH = currentParallax.height - cutY;
         let pW = Math.max(canvas.width * 1.5, 1200); 
         let worldMultiplier = 0.15;
         let pOff = (bgX * worldMultiplier) % pW;
-        let destH = canvas.height * 0.55; 
+        let destH = canvas.height * 0.65; // 🏔️ MAJESTIC ELEVATION (Panoramic Scale)
         let horizonY = CONFIG.trackY - destH + 20;
 
-        // 🌫️ 1. HORIZON HAZE BRIDGE (Refined Transparency for Reality)
-        let hazeGrd = ctx.createLinearGradient(0, horizonY - 60, 0, horizonY + 40);
+        // 🌫️ 1. HORIZON HAZE BRIDGE (Refined for Panoramic Scale)
+        let hazeGrd = ctx.createLinearGradient(0, horizonY - 100, 0, horizonY + 50);
         hazeGrd.addColorStop(0, 'rgba(0,0,0,0)');
-        hazeGrd.addColorStop(0.5, isSunset ? 'rgba(255, 160, 80, 0.3)' : 'rgba(200, 235, 255, 0.35)');
+        hazeGrd.addColorStop(0.5, `hsla(200, 90%, ${skyBrightRaw + 10}%, 0.4)`); // Matches sky hue
         hazeGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = hazeGrd; ctx.fillRect(0, horizonY - 60, canvas.width, 100);
+        ctx.fillStyle = hazeGrd; ctx.fillRect(0, horizonY - 100, canvas.width, 150);
 
         ctx.save();
         // 🎨 2. DYNAMIC HUE-MATCHING (Color Sync)

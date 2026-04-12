@@ -181,9 +181,16 @@ button {
     
     /* Dedicated Landscape Fix (V151.21) */
     @media (orientation: landscape) {
-        #gameCanvas, canvas { height: calc(100svh - 115px); }
-        #cockpit-ui { height: 115px; padding: 5px 30px; }
-        #alp-container { padding: 4px 10px; gap: 6px; }
+        #gameCanvas, canvas { height: calc(100svh - 110px); }
+        #cockpit-ui { 
+            height: 110px; 
+            padding: 5px 30px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(0, 255, 136, 0.3);
+            box-shadow: inset 0 10px 30px rgba(0, 255, 136, 0.05);
+        }
+        #alp-container { padding: 4px 10px; gap: 6px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); }
         #alp-avatar { width: 30px; height: 30px; }
         #signal-callout { font-size: 0.65rem; }
         #alp-name { font-size: 0.5rem; letter-spacing: 1px; }
