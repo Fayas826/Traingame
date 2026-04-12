@@ -468,7 +468,10 @@ function draw() {
     if(oppTrain) drawOppositeTrain(oppTrain);
     trees.filter(t => t.layer === 0).forEach(drawTree); 
     drawRestoredTrain();
-    drawForegroundGrass();
+
+    // 🌳 FOREGROUND GROUNDING: Lowered to clear train bogies (Adaptive Offset)
+    let foreOffset = (canvas.height < 500) ? 60 : 40; 
+    drawForegroundGrass(foreOffset);
     
     // Render Particles (Sparks & Smoke)
     particles.forEach(p => {
@@ -534,9 +537,13 @@ function drawSignals4Aspect() {
         if(sx > -100 && sx < canvas.width + 100) {
             ctx.fillStyle = '#222'; ctx.fillRect(sx, CONFIG.trackY-350, 12, 350); 
             ctx.fillStyle = '#111'; ctx.fillRect(sx-15, CONFIG.trackY-350, 42, 110);
+            
+            // Adaptive Wire Height (PC: ~300. Mobile: ~200)
+            let wireY = (canvas.height < 500) ? CONFIG.trackY - 200 : CONFIG.trackY - 325;
+            
             const drawAspect = (yOff, color, active) => {
                 ctx.fillStyle = active ? color : '#333';
-                ctx.beginPath(); ctx.arc(sx+6, CONFIG.trackY-335+yOff, 10, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(sx+6, wireY - 10 + yOff, 10, 0, Math.PI*2); ctx.fill();
                 if(active) { ctx.shadowBlur = 15; ctx.shadowColor = color; ctx.stroke(); ctx.shadowBlur = 0; }
             };
             drawAspect(0, '#0f0', s.aspect === 'GREEN'); 
@@ -620,7 +627,10 @@ function drawWAP7Procedural(x, y) {
     
     // Draw Pantograph Framework
     ctx.strokeStyle = '#444'; ctx.lineWidth = 4;
-    let px = x + 380, py = y, pHeight = Math.abs(py - (CONFIG.trackY - 325)); 
+    
+    // Adaptive Wire Connectivity (Same Logic as Signals)
+    let wireHeight = (canvas.height < 500) ? CONFIG.trackY - 200 : CONFIG.trackY - 325;
+    let px = x + 380, py = y, pHeight = Math.abs(py - wireHeight); 
     let shudder = (speed > 5) ? (Math.random() * 4 - 2) : 0;
     
     ctx.beginPath(); 
@@ -889,12 +899,18 @@ function drawStationProcedural(x, name) {
 
 function drawOHELines() { 
     let poleOffset = bgX % 450; 
-    ctx.lineWidth = 3; ctx.strokeStyle = '#4488ff'; ctx.beginPath(); ctx.moveTo(0, CONFIG.trackY-325); ctx.lineTo(canvas.width, CONFIG.trackY-325); ctx.stroke();
+    let wireY = (canvas.height < 500) ? CONFIG.trackY - 200 : CONFIG.trackY - 325;
+    ctx.lineWidth = 3; ctx.strokeStyle = '#4488ff'; ctx.beginPath(); ctx.moveTo(0, wireY); ctx.lineTo(canvas.width, wireY); ctx.stroke();
     for(let i=-450; i<canvas.width+450; i+=450) { let px = i-poleOffset; ctx.fillStyle = '#222'; ctx.fillRect(px, CONFIG.trackY-370, 15, 370); } 
 }
 
 function drawMainTrack() { let offset = bgX % 40; ctx.fillStyle = "#444"; ctx.fillRect(0, CONFIG.trackY, canvas.width, 8); for(let i=-40; i<canvas.width+40; i+=40) { ctx.fillStyle = "#6b4f3b"; ctx.fillRect(i-offset, CONFIG.trackY, 20, 6); } ctx.fillStyle = "#aaa"; ctx.fillRect(0, CONFIG.trackY - 2, canvas.width, 2); }
-function drawForegroundGrass() { let offset = (bgX * 2.5) % 400; ctx.fillStyle = '#0a1d0a'; for(let i=-400; i<canvas.width+400; i+=250) ctx.fillRect(i-offset, canvas.height-80, 80, 80); }
+function drawForegroundGrass(yOffset = 40) { 
+    let offset = (bgX * 2.5) % 400; 
+    ctx.fillStyle = '#0a1d0a'; 
+    let grassY = canvas.height + yOffset - 120;
+    for(let i=-400; i<canvas.width+400; i+=250) ctx.fillRect(i-offset, grassY, 80, 80); 
+}
 
 function drawMegaBridge(x, width) {
     ctx.fillStyle = '#002b4d'; ctx.fillRect(0, CONFIG.trackY+10, canvas.width, canvas.height); ctx.save(); ctx.translate(x, 0);

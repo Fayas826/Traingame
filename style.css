@@ -179,10 +179,14 @@ button {
 @media (max-width: 900px) {
     #alp-hud { top: 10px; left: 10px; }
     
-    /* Dedicated Landscape Fix */
+    /* Dedicated Landscape Fix (V151.21) */
     @media (orientation: landscape) {
         #gameCanvas, canvas { height: calc(100svh - 140px); }
-        #cockpit-ui { height: 140px; }
+        #cockpit-ui { height: 140px; padding: 10px 40px; }
+        #alp-container { padding: 8px 15px; gap: 10px; }
+        #alp-avatar { width: 45px; height: 45px; }
+        #signal-callout { font-size: 0.9rem; }
+        #mission-stat { font-size: 0.8rem; padding: 5px 10px; top: 10px; }
     }
 
     #cockpit-ui { 
