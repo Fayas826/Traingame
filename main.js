@@ -364,16 +364,6 @@ function draw() {
         // Solid Moon Core
         ctx.fillStyle = `rgba(255, 255, 230, ${starOp})`;
         ctx.beginPath(); ctx.arc(moonX, moonY, moonRad, 0, Math.PI*2); ctx.fill();
-
-        // 3. Shooting Stars (Rare surprise)
-        shootingStars.forEach((ss, idx) => {
-            ctx.strokeStyle = `rgba(255, 255, 255, ${ss.life})`;
-            ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(ss.x, ss.y); ctx.lineTo(ss.x - ss.vx, ss.y - ss.vy); ctx.stroke();
-            ss.x += ss.vx; ss.y += ss.vy; ss.life -= 0.02;
-            if(ss.life <= 0) shootingStars.splice(idx, 1);
-        });
-        if(Math.random() < 0.005) spawnShootingStar();
     }
 
     clouds.forEach(c => {
