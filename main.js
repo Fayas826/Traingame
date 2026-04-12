@@ -122,7 +122,7 @@ function resize() {
     
     // 🎨 MOBILE ADAPTIVE ENGINE (Aggressive 60% Scaling)
     const isMobileLocal = canvas.height < 500;
-    CONFIG.vScale = isMobileLocal ? 0.60 : 1.0;
+    CONFIG.vScale = isMobileLocal ? 0.60 : 0.88; // 🖥️ Harmonized PC Scale
     CONFIG.trackY = isMobileLocal ? canvas.height * 0.70 : canvas.height * 0.85;
 }
 
@@ -825,50 +825,45 @@ function drawTree(t) {
 }
 
 function drawStationProcedural(x, name) {
-    const pW = 7500; 
+    const pW = sc(7500); 
     
     // Better 3D Platform Roof
-    let roofGrd = ctx.createLinearGradient(0, CONFIG.trackY-450, 0, CONFIG.trackY-300);
+    let roofGrd = ctx.createLinearGradient(0, CONFIG.trackY-sc(450), 0, CONFIG.trackY-sc(300));
     roofGrd.addColorStop(0, '#5a1f1f');
     roofGrd.addColorStop(1, '#8b2e2e');
     ctx.fillStyle = roofGrd;
-    ctx.fillRect(x - pW/2, CONFIG.trackY-450, pW, 150);
+    ctx.fillRect(x - pW/2, CONFIG.trackY-sc(450), pW, sc(150));
     ctx.fillStyle = '#3a1313'; // Roof edge
-    ctx.fillRect(x - pW/2, CONFIG.trackY-300, pW, 10);
+    ctx.fillRect(x - pW/2, CONFIG.trackY-sc(300), pW, sc(10));
     
-    // Platform Base
-    ctx.fillStyle = '#222'; ctx.fillRect(x-pW/2, CONFIG.trackY-28, pW, 28);
-    ctx.fillStyle = '#ffd700'; ctx.fillRect(x-pW/2, CONFIG.trackY-22, pW, 3); // Safety line
-    
-    // Hindi translation placeholder
-    let hindiName = "भारतीय रेल"; 
-    
-    // Pillars and details distributed across length
-    for(let k=0; k<25; k++) {
-        let sx = x - pW/2.5 + (k * 400);
+    const hindiNames = { "KOLLAM JCT": "कोल्लम जंक्शन", "PARAVUR": "परवूर", "VARKALA SIVAGIRI": "वरकला शिवगिरि", "KADAKKAVUR": "कडक्कावूर", "CHIRAYINKEEZHU": "चिरायिनकीझु", "TRIVANDRUM CENTRAL": "तिरुवनंतपुरम सेंट्रल" };
+    const hindiName = hindiNames[name] || "";
+
+    for(let k=0; k<20; k++) {
+        let sx = x - pW/2.5 + (k * sc(400));
         
         // Steel Pillars
         ctx.fillStyle = '#7f8c8d'; 
-        ctx.fillRect(sx, CONFIG.trackY-300, 15, 272); 
+        ctx.fillRect(sx, CONFIG.trackY-sc(300), sc(15), sc(272)); 
         
         // Digital LED indicators hanging from roof
         if (k % 2 === 0) {
-            ctx.fillStyle = '#111'; ctx.fillRect(sx - 40, CONFIG.trackY-280, 100, 30);
-            ctx.fillStyle = '#ff3333'; ctx.font = 'bold 12px monospace'; ctx.fillText('ETA 05 MIN', sx + 10, CONFIG.trackY-260);
+            ctx.fillStyle = '#111'; ctx.fillRect(sx - sc(40), CONFIG.trackY-sc(280), sc(100), sc(30));
+            ctx.fillStyle = '#ff3333'; ctx.font = `bold ${sc(12)}px monospace`; ctx.fillText('ETA 05 MIN', sx + sc(10), CONFIG.trackY-sc(260));
         }
         
         // Authentic Station Display Board
         if (k % 5 === 1) {
-            ctx.fillStyle = '#111'; ctx.fillRect(sx + 10, CONFIG.trackY-200, 10, 100); // Posts
-            ctx.fillRect(sx + 180, CONFIG.trackY-200, 10, 100);
+            ctx.fillStyle = '#111'; ctx.fillRect(sx + sc(10), CONFIG.trackY-sc(200), sc(10), sc(100)); // Posts
+            ctx.fillRect(sx + sc(180), CONFIG.trackY-sc(200), sc(10), sc(100));
             
-            ctx.fillStyle = '#ffcc00'; ctx.fillRect(sx, CONFIG.trackY-200, 200, 80); // Classic yellow board
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.strokeRect(sx, CONFIG.trackY-200, 200, 80);
+            ctx.fillStyle = '#ffcc00'; ctx.fillRect(sx, CONFIG.trackY-sc(200), sc(200), sc(80)); // Classic yellow board
+            ctx.strokeStyle = '#000'; ctx.lineWidth = sc(4); ctx.strokeRect(sx, CONFIG.trackY-sc(200), sc(200), sc(80));
             
             ctx.fillStyle = '#000'; 
             ctx.textAlign = 'center';
-            ctx.font = 'bold 20px Arial'; ctx.fillText(name, sx + 100, CONFIG.trackY-150); // English
-            ctx.font = 'bold 14px Arial'; ctx.fillText(hindiName, sx + 100, CONFIG.trackY-175); // Hindi
+            ctx.font = `bold ${sc(20)}px Arial`; ctx.fillText(name, sx + sc(100), CONFIG.trackY-sc(150)); // English
+            ctx.font = `bold ${sc(14)}px Arial`; ctx.fillText(hindiName, sx + sc(100), CONFIG.trackY-sc(175)); // Hindi
         }
         
         // Benches and Stalls

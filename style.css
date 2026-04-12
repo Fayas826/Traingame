@@ -37,25 +37,28 @@ canvas {
 
 /* 🎙️ ALP HUD */
 #alp-hud {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 10;
+    position: fixed;
+    top: 25px;
+    left: 25px;
+    z-index: 100;
+    transform: scale(0.85);
+    transform-origin: top left;
 }
 
 #mission-stat {
-    position: absolute;
-    top: 10px;
-    right: 15px;
-    background: rgba(0,0,0,0.8);
-    padding: 8px 15px;
-    border-radius: 4px;
-    border-left: 3px solid #00ff00;
-    color: #00ff00;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 1.2rem;
-    font-weight: bold;
-    text-shadow: 0 0 5px #00ff00;
+    position: fixed;
+    top: 25px;
+    right: 25px;
+    background: rgba(0,20,0,0.9);
+    border-left: 5px solid var(--accent);
+    padding: 10px 20px;
+    color: var(--accent);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    z-index: 100;
+    box-shadow: 0 0 20px rgba(0,255,136,0.1);
+    transform: scale(0.85);
+    transform-origin: top right;
 }
 
 #alp-container {
@@ -102,13 +105,14 @@ canvas {
     display: flex;
     flex-wrap: nowrap;
     overflow: hidden;
-    background: linear-gradient(to top, rgba(0,0,0,1), rgba(0,0,0,0.8));
-    border-top: 2px solid #333;
-    padding: 30px 50px;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(25px);
+    border-top: 1px solid rgba(0, 255, 136, 0.2);
+    box-shadow: inset 0 20px 50px rgba(0, 255, 136, 0.03);
+    padding: 20px 60px;
     justify-content: space-between;
     align-items: center;
     z-index: 10;
-    backdrop-filter: blur(15px);
 }
 
 .stat-group {
@@ -137,9 +141,11 @@ canvas {
 
 .control-group {
     display: flex;
-    gap: 40px;
+    gap: 50px;
     flex-grow: 1;
-    max-width: 600px;
+    max-width: 800px;
+    margin: 0 40px;
+    justify-content: center;
 }
 
 .lever-wrapper {
