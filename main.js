@@ -422,20 +422,22 @@ function draw() {
         }
         ctx.restore();
 
-        // 🌟 4. RIM LIGHTING BLOOM (Cinematic Glow - SOFTENED)
+        // 🌟 4. RIM LIGHTING BLOOM (Cinematic Glow - BOOSTED)
         ctx.globalCompositeOperation = 'lighter';
-        let bloomGrd = ctx.createLinearGradient(0, horizonY - 100, 0, horizonY + 50);
-        bloomGrd.addColorStop(0, isSunset ? 'rgba(255, 120, 0, 0.2)' : 'rgba(180, 220, 255, 0.25)');
+        let bloomGrd = ctx.createLinearGradient(0, horizonY - 120, 0, horizonY + 60);
+        bloomGrd.addColorStop(0, isSunset ? 'rgba(255, 120, 0, 0.4)' : 'rgba(180, 220, 255, 0.45)');
+        bloomGrd.addColorStop(0.3, isSunset ? 'rgba(255, 120, 0, 0.25)' : 'rgba(180, 220, 255, 0.3)');
         bloomGrd.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = bloomGrd; 
-        ctx.fillRect(0, horizonY - 100, canvas.width, 150);
+        ctx.fillRect(0, horizonY - 120, canvas.width, 180);
         ctx.globalCompositeOperation = 'source-over';
 
-        // 🌫️ 5. ATMOSPHERIC FEATHER (Soft Horizon Mist)
-        let featherGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 150);
-        featherGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.15)' : 'rgba(200, 230, 255, 0.15)');
+        // 🌫️ 5. ATMOSPHERIC FEATHER (Dense Horizon Mist - BOOSTED)
+        let featherGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 250);
+        featherGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.4)' : 'rgba(200, 230, 255, 0.45)');
+        featherGrd.addColorStop(0.2, isSunset ? 'rgba(200, 100, 50, 0.2)' : 'rgba(200, 230, 255, 0.2)');
         featherGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = featherGrd; ctx.fillRect(0, horizonY, canvas.width, 150);
+        ctx.fillStyle = featherGrd; ctx.fillRect(0, horizonY, canvas.width, 250);
 
         // ⚓ 6. GROUND ANCHORING
         let anchorGrd = ctx.createLinearGradient(0, CONFIG.trackY - 100, 0, CONFIG.trackY);
