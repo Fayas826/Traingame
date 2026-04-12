@@ -17,7 +17,7 @@ const CONFIG = {
 };
 
 let canvas, ctx, speedCanvas, sctx, speed = 0, worldDistance = 0, bgX = 0, throttle = 0, brake = 0;
-let trees = [], clouds = [], rainDrops = [], foregroundObjects = [], mountains = [], stars = [];
+let trees = [], clouds = [], rainDrops = [], foregroundObjects = [], mountains = [], stars = [], mistParticles = [];
 let stations = [], signals = [], coachOffsets = [];
 let timeOfDay = 0, wheelRotation = 0; 
 let audioStarted = false, hornAudio, locoAudio, slowTrackAudio, fastTrackAudio, crowdAudio;
@@ -58,6 +58,7 @@ function init() {
     for(let i=0; i<12; i++) spawnMountain();
     for(let i=0; i<20; i++) spawnVolumetricCloud(Math.random() * canvas.width);
     for(let i=0; i<100; i++) rainDrops.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: 10 + Math.random()*15 });
+    for(let i=0; i<50; i++) mistParticles.push({ x: Math.random()*2000, y: CONFIG.trackY - 250 + Math.random()*200, sz: 50+Math.random()*150, dx: 0.2 + Math.random()*0.4 });
     
     // 🚉 6-STATION EXPANSION (CLIENT SPEC 6)
     stations.push({ name: "KOLLAM JCT", x: 0, annDone: false });
@@ -328,28 +329,21 @@ function draw() {
         let skyOff = (bgX * skyFactor) % imgSky.width;
         ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
         
-        // --- 1. SEAM-BUSTER ENGINE (Feathered Healing Stitches) ---
+        // --- 1. SEAM-BUSTER ENGINE (Safety Blending For 0-Seam Sky) ---
         let startX = -skyOff;
         let tW = Math.ceil(imgSky.width);
         while(startX < canvas.width) {
             // Base Tile Draw
-            ctx.drawImage(imgSky, startX, -20, tW + 25, canvas.height + 100); 
+            ctx.drawImage(imgSky, startX, -20, tW + 5, canvas.height + 100); 
             
-            // 🩹 Healing Strip (Stitches the seam between tiles with a 100px feather)
-            if (startX + tW < canvas.width + 100) {
-                let sRect = 100;
+            // 🩹 Safety Healing (Feathered Alpha Overlap - No Shadows)
+            if (startX + tW < canvas.width + 150) {
+                let sRect = 150; 
                 ctx.save();
-                let seamGrd = ctx.createLinearGradient(startX + tW - sRect/2, 0, startX + tW + sRect/2, 0);
-                seamGrd.addColorStop(0, 'rgba(255,255,255,0)');
-                seamGrd.addColorStop(0.5, 'rgba(255,255,255,1)');
-                seamGrd.addColorStop(1, 'rgba(255,255,255,0)');
-                ctx.globalCompositeOperation = 'destination-in'; // Masks the healing strip
-                // (Note: To keep it surgical, I'll use alpha-blended overlap instead of destination-in)
+                ctx.globalAlpha *= 0.4; // Soft overlap blend
+                ctx.drawImage(imgSky, 0, 0, sRect, imgSky.height, startX + tW - sRect/2, -20, sRect, canvas.height + 100);
                 ctx.restore();
                 
-                // Simplified Healing: Draw the overlap with a smooth alpha ramp
-                ctx.globalAlpha *= 0.5; // Double-draw alpha for blending
-                ctx.drawImage(imgSky, 0, 0, sRect, imgSky.height, startX + tW - sRect/2, -20, sRect, canvas.height + 100);
                 ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
             }
             startX += tW;
@@ -420,46 +414,70 @@ function draw() {
         // --- EXTREME REALISM PERSPECTIVE ENGINE (V152.0) ---
         const skyVoid = canvas.height * 0.35; // 🌌 Protected Space for Infinite Sky
         let pW = Math.max(canvas.width * 1.5, 1200); 
-        let worldMultiplier = 0.15;
-        let pOff = (bgX * worldMultiplier) % pW;
         
-        // Adaptive Mountain Height (Ensures mountains never crush the Sky-Void)
-        let destH = canvas.height - CONFIG.trackY + (canvas.height * 0.2); 
-        if (canvas.height - destH < skyVoid) destH = canvas.height - skyVoid;
-        
-        let horizonY = CONFIG.trackY - destH + 15; // Anchored with realistic 15px overlap
+        // --- 🌊 ULTIMATE REALISM: DUAL-PASS DEPTH ENGINE (V17.0) ---
+        const drawPlane = (passType) => {
+            let config = {
+                far: { speed: 0.055, blur: 2.2, bright: 75, scale: 0.38, overlap: 35 },
+                mid: { speed: 0.095, blur: 1.2, bright: 85, scale: 0.45, overlap: 25 }
+            }[passType];
 
-        ctx.save();
-        // 🎨 2. DYNAMIC HUE-MATCHING (Color Sync + Atmospheric Blur)
-        let atmosBlur = (CONFIG.vScale > 0.8) ? 'blur(1px)' : 'blur(0.5px)'; // Subtler blur on mobile
-        if(isNight) ctx.filter = `${atmosBlur} brightness(35%) contrast(110%) hue-rotate(10deg)`;
-        else if(isSunset) ctx.filter = `${atmosBlur} brightness(75%) sepia(50%) saturate(140%) hue-rotate(-15deg)`;
-        else ctx.filter = `${atmosBlur} brightness(72%) contrast(85%) saturate(75%) sepia(10%)`; 
+            let pOff = (bgX * config.speed) % pW;
+            let destH = (canvas.height * config.scale) + 5;
+            let hY = CONFIG.trackY - destH + config.overlap;
 
-        // ⛰️ 3. TILING WITH EDGE FEATHERING
-        let mountainX = -pOff;
-        let tileWidth = Math.ceil(pW);
-        while(mountainX < canvas.width) {
-            // Draw mountain tile (CutY restored to classic asset level)
-            let scH = currentParallax.height * 0.55; 
-            ctx.drawImage(currentParallax, 0, currentParallax.height - scH, currentParallax.width, scH, mountainX, horizonY - 1, tileWidth + 20, destH + 2);
-            
-            // Subtle Peak Softener (Re-synced to current sky)
-            let peakSoftGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 60);
-            peakSoftGrd.addColorStop(0, `hsla(210, 50%, 90%, 0.08)`); 
-            peakSoftGrd.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = peakSoftGrd; ctx.fillRect(mountainX, horizonY, tileWidth + 20, 60);
-            
-            mountainX += tileWidth;
-        }
-        ctx.restore();
+            ctx.save();
+            // 🎨 ATMOSPHERIC OPTICS (Advanced Rim Glow + Indigo Shadows)
+            let baseBlur = (CONFIG.vScale > 0.8) ? config.blur : config.blur * 0.6;
+            let filter = `blur(${baseBlur}px) brightness(${config.bright}%) contrast(90%)`;
+            if(isNight) filter = `blur(${baseBlur}px) brightness(25%) contrast(110%)`;
+            else if(isSunset) filter = `blur(${baseBlur}px) brightness(75%) sepia(35%) saturate(140%)`;
+            ctx.filter = filter;
 
-        // 🌫️ 5. ATMOSPHERIC BRIDGE (Extreme Realism Sync - Deep 250px)
-        let bridgeGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 250);
-        bridgeGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.15)' : 'rgba(210, 230, 255, 0.12)');
-        bridgeGrd.addColorStop(0.4, isSunset ? 'rgba(200, 100, 50, 0.05)' : 'rgba(210, 230, 255, 0.05)');
+            let xPos = -pOff;
+            while(xPos < canvas.width) {
+                let scH = currentParallax.height * config.scale;
+                ctx.drawImage(currentParallax, 0, currentParallax.height - scH, currentParallax.width, scH, xPos, hY, pW + 10, destH + 5);
+                
+                // ⛅ SUN-RIM GLOW (Rim Lighting for Peak Realism)
+                if(!isNight) {
+                    let rimGrd = ctx.createLinearGradient(0, hY, 0, hY + 15);
+                    rimGrd.addColorStop(0, isSunset ? 'rgba(255, 180, 100, 0.15)' : 'rgba(255, 255, 255, 0.1)');
+                    rimGrd.addColorStop(1, 'rgba(0,0,0,0)');
+                    ctx.fillStyle = rimGrd; ctx.fillRect(xPos, hY, pW + 10, 15);
+                }
+
+                // ⚓ INDIGO AMBIENT OCCLUSION (Cool-Tone Perspective)
+                let anchorShadow = ctx.createLinearGradient(0, hY + destH - 80, 0, hY + destH);
+                anchorShadow.addColorStop(0, 'rgba(0,0,0,0)');
+                anchorShadow.addColorStop(1, isSunset ? 'rgba(40, 10, 0, 0.3)' : 'rgba(10, 15, 45, 0.25)'); // Indigo shadows
+                ctx.fillStyle = anchorShadow; ctx.fillRect(xPos, hY + destH - 80, pW + 10, 80);
+                
+                xPos += pW;
+            }
+            ctx.restore();
+        };
+
+        // Execute Dual Passes
+        drawPlane('far');
+        drawPlane('mid');
+
+        // 🌫️ 5. DEEP ATMOSPHERIC BRIDGE (Extreme Distance Sync - Ghat-Mist Grey-Green)
+        let bridgeGrd = ctx.createLinearGradient(0, CONFIG.trackY - 200, 0, CONFIG.trackY + 100);
+        let mistColor = isSunset ? '210, 100, 50' : '180, 195, 205'; 
+        bridgeGrd.addColorStop(0, 'rgba(0,0,0,0)');
+        bridgeGrd.addColorStop(0.5, `rgba(${mistColor}, 0.15)`);
         bridgeGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = bridgeGrd; ctx.fillRect(0, horizonY, canvas.width, 250);
+        ctx.fillStyle = bridgeGrd; ctx.fillRect(0, CONFIG.trackY - 200, canvas.width, 300);
+
+        // 🌬️ ATMOSPHERIC BREATH (Drifting Particles)
+        mistParticles.forEach(p => {
+            p.x -= p.dx; if(p.x < -200) p.x = canvas.width + 200;
+            let pGrd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.sz);
+            pGrd.addColorStop(0, `rgba(${mistColor}, 0.08)`);
+            pGrd.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = pGrd; ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI*2); ctx.fill();
+        });
 
         // ⚓ 6. GROUND ANCHORING
         let anchorGrd = ctx.createLinearGradient(0, CONFIG.trackY - 100, 0, CONFIG.trackY);
@@ -467,13 +485,17 @@ function draw() {
         anchorGrd.addColorStop(1, 'rgba(0,0,0,0.6)');
         ctx.fillStyle = anchorGrd; ctx.fillRect(0, CONFIG.trackY-100, canvas.width, 100);
 
+        // Restoration of variables for legacy effects (Night Lights)
+        let midSpeed = 0.095;
+        let midHorizonY = CONFIG.trackY - (canvas.height * 0.45) + 25;
+
         if(distKM > 100 && isNight) {
             ctx.fillStyle = 'rgba(255,200,100,0.8)';
-            let winOff = (bgX * worldMultiplier) % pW;
+            let winOff = (bgX * midSpeed) % pW;
             let winX = -winOff;
             while(winX < canvas.width) {
                 for(let w=0; w<20; w++) {
-                    ctx.fillRect( winX + (w*150)%pW, horizonY + 60 + Math.random()*150, 4, 4 );
+                    ctx.fillRect( winX + (w*150)%pW, midHorizonY + 60 + Math.random()*150, 4, 4 );
                 }
                 winX += pW;
             }
@@ -482,10 +504,24 @@ function draw() {
 
     trees.filter(t => t.layer === 2).forEach(drawTree);
 
+    let distSinceLast = 1000000;
+    stations.forEach(s => { let d = worldDistance - s.x; if(d >= 0 && d < distSinceLast) distSinceLast = d; });
+    let isGhatMode = distSinceLast < 30000; // 30km High-Altitude Departure
+
+    // 🌍 PROCEDURAL TERRAIN SWITCHER (Rare Bridges vs. Solid Ground)
+    let terrainToggle = Math.sin(worldDistance / 6000); 
+    let isBridgeBiome = terrainToggle > 0.65; // ~25% Bridges (Rare Leaps)
+
+    // 🛡️ FAIL-SAFE GROUND SEAL (Prevents any sky-leaks)
+    ctx.fillStyle = isNight ? '#050805' : '#0a120a';
+    ctx.fillRect(0, CONFIG.trackY, canvas.width, canvas.height - CONFIG.trackY);
+
     let staticBridgeX = (worldDistance < 100000) ? 50000 : 150000;
     const bridgeRelativeX = staticBridgeX - worldDistance + (canvas.width / 2);
-    if(bridgeRelativeX > -8000 && bridgeRelativeX < canvas.width + 8000) drawMegaBridge(bridgeRelativeX - 4000, 8000);
-    else { ctx.fillStyle = '#1a221a'; ctx.fillRect(0, CONFIG.trackY, canvas.width, canvas.height - CONFIG.trackY); }
+
+    if(bridgeRelativeX > -8000 && bridgeRelativeX < canvas.width + 8000) drawMegaBridge(bridgeRelativeX - 4000, 8000, isSunset, isNight);
+    else if (isBridgeBiome) drawStandardArches(isGhatMode);
+    else drawEarthenBase(isSunset, isNight);
 
     drawOHELines();
     drawSignals4Aspect();
@@ -529,14 +565,29 @@ function draw() {
         });
     }
 
-    // Foreground High-Speed Overlay (Lowered to clear train wheels)
+    // Foreground High-Speed Overlay (Softened for Realism)
     foregroundObjects.forEach(f => {
+        ctx.save();
         if(f.isPole) {
             ctx.fillStyle = '#222'; ctx.fillRect(f.x, CONFIG.trackY + 10, 20, canvas.height);
             ctx.fillStyle = '#ff3333'; ctx.fillRect(f.x - 5, CONFIG.trackY + 20, 30, 30);
         } else {
-            ctx.fillStyle = '#0f2f0f'; ctx.beginPath(); ctx.arc(f.x, canvas.height + 40, 100, 0, Math.PI*2); ctx.fill();
+            // 🌳 3D BOURNE BUSHES (Radial Gradient Lighting)
+            let bushGrd = ctx.createRadialGradient(f.x, canvas.height - 40, 10, f.x, canvas.height + 40, 120);
+            bushGrd.addColorStop(0, '#1a3d1a'); // Inner core
+            bushGrd.addColorStop(0.6, '#0f2f0f'); // Mid
+            bushGrd.addColorStop(1, '#051505'); // Deep base
+            
+            ctx.shadowBlur = 15; ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.fillStyle = bushGrd; 
+            ctx.beginPath(); ctx.arc(f.x, canvas.height + 40, 110, 0, Math.PI*2); ctx.fill();
+            
+            // Atmospheric Light-Wrap (Makes the bush feel 'In' the sunlight)
+            ctx.globalAlpha = 0.15;
+            ctx.fillStyle = isSunset ? '#ffa07a' : '#ffffff';
+            ctx.beginPath(); ctx.arc(f.x, canvas.height + 40, 115, 0, Math.PI*2); ctx.stroke();
         }
+        ctx.restore();
     });
 
     // Dark Tunnel Overlay
@@ -849,8 +900,18 @@ function drawTree(t) {
 
 function drawStationProcedural(x, name) {
     const pW = sc(7500); 
-    
-    // Better 3D Platform Roof
+    // 🏟️ 1. THE CONCRETE SLAB (3D Station Base)
+    let slabGrd = ctx.createLinearGradient(0, CONFIG.trackY-sc(10), 0, CONFIG.trackY+sc(20));
+    slabGrd.addColorStop(0, '#7f8c8d'); // Concrete Top
+    slabGrd.addColorStop(1, '#2c3e50'); // Dark vertical face
+    ctx.fillStyle = slabGrd;
+    ctx.fillRect(x - pW/2, CONFIG.trackY - sc(10), pW, sc(110));
+
+    // 🟡 Safety Yellow Line
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillRect(x - pW/2, CONFIG.trackY - sc(8), pW, sc(6));
+
+    // 🏠 2. BETTER 3D PLATFORM ROOF
     let roofGrd = ctx.createLinearGradient(0, CONFIG.trackY-sc(450), 0, CONFIG.trackY-sc(300));
     roofGrd.addColorStop(0, '#5a1f1f');
     roofGrd.addColorStop(1, '#8b2e2e');
@@ -906,16 +967,14 @@ function drawStationProcedural(x, name) {
         }
     }
     
-    // Dynamic Crowd (animated shadow silhouettes based on time)
-    ctx.fillStyle = '#1a1a1a';
+    // Dynamic Crowd (Groundedsilhouettes)
     for(let j=0; j<80; j++) { 
         let walkOffset = Math.sin((Date.now()/500) + j) * 20; 
         let px = x - pW/2.2 + (j*130) + walkOffset; 
-        
-        // Head
-        ctx.beginPath(); ctx.arc(px, CONFIG.trackY-75, 8, 0, Math.PI*2); ctx.fill(); 
-        // Body
-        ctx.fillRect(px-8, CONFIG.trackY-67, 16, 28); 
+        let py = CONFIG.trackY - sc(10); // Floor contact
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath(); ctx.arc(px, py - 45, 10, 0, Math.PI*2); ctx.fill(); 
+        ctx.fillRect(px-5, py - 35, 10, 35);
         // Legs (animated swinging)
         let legSwing = Math.sin(Date.now()/200 + j)*6;
         ctx.fillRect(px-4 + legSwing, CONFIG.trackY-39, 4, 15);
@@ -965,16 +1024,132 @@ function drawForegroundGrass(yOffset = 40) {
     }
 }
 
-function drawMegaBridge(x, width) {
-    ctx.fillStyle = '#002b4d'; ctx.fillRect(0, CONFIG.trackY+10, canvas.width, canvas.height); ctx.save(); ctx.translate(x, 0);
-    for(let k=0; k<6; k++) { let hx = 600 + k*1400; ctx.fillStyle = '#4e342e'; ctx.fillRect(hx, CONFIG.trackY+60, 220, 70); ctx.fillStyle = '#d7ccc8'; ctx.fillRect(hx+20, CONFIG.trackY+15, 180, 50); ctx.fillStyle = '#111'; ctx.fillRect(hx+40, CONFIG.trackY+25, 30, 20); }
-    for(let i=0; i<Math.floor(width/650); i++) { let px = i*650; ctx.fillStyle = '#1a1a1a'; ctx.fillRect(px, CONFIG.trackY+10, 120, canvas.height); ctx.fillStyle = '#0a0a0a'; ctx.beginPath(); ctx.moveTo(px+120, CONFIG.trackY+10); ctx.quadraticCurveTo(px+380, CONFIG.trackY+220, px+600, CONFIG.trackY+10); ctx.fill(); }
-    ctx.strokeStyle = 'rgba(50, 50, 50, 0.7)'; ctx.lineWidth = 6;
+function drawMegaBridge(x, width, isSunset, isNight) {
+    // 🧬 1. QUANTUM PHYSICS CALCULATIONS (The Pulse & The Jitter)
+    let pulse = Math.sin(Date.now() / 1500) * 0.15 + 0.85; // Light-bounce oscillation
+    let jitterY = (speed > 5) ? (Math.random() - 0.5) * (speed / 12) : 0; // High-frequency structural vibration
+    
+    // 🌉 2. SHIP-BASE (Deep Sea/Mist Floor)
+    let mistBase = isSunset ? '#2a1a1a' : (isNight ? '#050a1a' : '#102535');
+    ctx.fillStyle = mistBase; ctx.fillRect(0, CONFIG.trackY+1, canvas.width, canvas.height); 
+    
+    ctx.save(); 
+    ctx.translate(x, jitterY); // Apply structural vibration matrix
+
+    // 🏗️ 3. REINFORCED ARCH ARCHITECTURE
+    for(let i=0; i<Math.floor(width/650); i++) { 
+        let px = i*650; 
+        
+        // 🪨 Weathered Masonry (With Neural Decals)
+        let stoneGrd = ctx.createLinearGradient(px, CONFIG.trackY, px+120, CONFIG.trackY);
+        stoneGrd.addColorStop(0, '#1a1d1a'); stoneGrd.addColorStop(0.5, '#2c352c'); stoneGrd.addColorStop(1, '#0a0d0a');
+        ctx.fillStyle = stoneGrd; 
+        ctx.fillRect(px, CONFIG.trackY+1, 120, canvas.height); 
+
+        // Procedural Staining (Weathering Decals)
+        if(i % 2 === 0) {
+            ctx.fillStyle = 'rgba(0, 20, 0, 0.15)'; // Moss/Algae
+            ctx.fillRect(px+20, CONFIG.trackY + 150, 40, 300);
+        }
+
+        // 🌑 DYNAMIC PULSE DEPTH (Neural Ambient Occlusion)
+        ctx.beginPath(); 
+        ctx.moveTo(px+120, CONFIG.trackY+1); 
+        ctx.quadraticCurveTo(px+380, CONFIG.trackY+240, px+600, CONFIG.trackY+1); 
+        
+        let archGrd = ctx.createRadialGradient(px+360, CONFIG.trackY+80, 50, px+360, CONFIG.trackY+80, 250);
+        archGrd.addColorStop(0, `rgba(0,0,0,${0.85 * pulse})`); // Shadow actually pulses with life
+        archGrd.addColorStop(1, 'rgba(15, 25, 15, 0.4)'); 
+        ctx.fillStyle = archGrd; ctx.fill(); 
+
+        ctx.strokeStyle = `rgba(61, 69, 61, ${0.4 * pulse})`; ctx.lineWidth = 4;
+        ctx.stroke();
+    }
+
+    // 🔩 4. SPECULAR TRUSS SYSTEM (Neural Bloom Engine)
     for(let i=0; i<Math.floor(width/900); i++) {
-        let tx = i*900; ctx.strokeRect(tx, CONFIG.trackY-480, 900, 480);
-        ctx.beginPath(); ctx.moveTo(tx, CONFIG.trackY-480); ctx.lineTo(tx+450, CONFIG.trackY); ctx.lineTo(tx+900, CONFIG.trackY-480); ctx.stroke();
+        let tx = i*900; 
+        
+        // Base Steel Frame
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 8;
+        ctx.strokeRect(tx, CONFIG.trackY-480, 900, 480);
+        
+        // Composite Specular Pass (Molecular Metal Glow)
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = isSunset ? 'rgba(255, 180, 100, 0.12)' : 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 4;
+        ctx.beginPath(); 
+        ctx.moveTo(tx, CONFIG.trackY-480); ctx.lineTo(tx+450, CONFIG.trackY); ctx.lineTo(tx+900, CONFIG.trackY-480); 
+        ctx.stroke();
+        
+        // Kinetic High-Speed Glint
+        let glintOff = (worldDistance / 10) % 900;
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(tx + glintOff, CONFIG.trackY-480); ctx.lineTo(tx + glintOff + 20, CONFIG.trackY-480); 
+        ctx.stroke();
+        ctx.restore();
     }
     ctx.restore();
+}
+function drawStandardArches(isHigh = false) {
+    const archWidth = 800;
+    const startX = - (worldDistance % archWidth) - archWidth;
+    const archDepth = isHigh ? 450 : 220; // ⛰️ High-Ghat Leap Physics
+    
+    // 🧬 PULSE & INDIGO SHADOW SYNC
+    let pulse = Math.sin(Date.now() / 1500) * 0.1 + 0.9;
+
+    for (let x = startX; x < canvas.width + archWidth; x += archWidth) {
+        // 🪨 Reinforced Pillar Structure
+        let pillarGrd = ctx.createLinearGradient(x, CONFIG.trackY, x + 150, CONFIG.trackY);
+        pillarGrd.addColorStop(0, '#1a1d1a'); pillarGrd.addColorStop(1, '#0a0d0a');
+        ctx.fillStyle = pillarGrd; ctx.fillRect(x, CONFIG.trackY + 1, 150, canvas.height);
+        
+        if(isHigh) { // Extra architectural tier for high-altitude mountains
+            ctx.fillStyle = '#080a08'; ctx.fillRect(x - 20, CONFIG.trackY + 1, 190, 40);
+        }
+
+        // 🌑 3D ARCH DEPTH (The 'Real-Life' shadow logic)
+        ctx.beginPath(); 
+        ctx.moveTo(x + 150, CONFIG.trackY + 1); 
+        ctx.quadraticCurveTo(x + 400, CONFIG.trackY + archDepth, x + 650, CONFIG.trackY + 1); 
+        
+        let archGrd = ctx.createRadialGradient(x + 400, CONFIG.trackY + 80, 50, x + 400, CONFIG.trackY + 80, 250);
+        archGrd.addColorStop(0, `rgba(10, 15, 45, ${0.45 * pulse})`); 
+        archGrd.addColorStop(1, 'rgba(0,0,0,0)'); 
+        ctx.fillStyle = archGrd; ctx.fill(); 
+        
+        ctx.strokeStyle = '#2c352c'; ctx.lineWidth = 4; ctx.stroke();
+    }
+}
+function drawEarthenBase(isSunset, isNight) {
+    // 🪨 Solid Earthen Embankment (3D Trapezoid)
+    ctx.fillStyle = isNight ? '#0a0d0a' : '#1a1d1a';
+    
+    // 🏟️ 1. THE BALLAST TOP (No-Gap Physics)
+    ctx.fillRect(0, CONFIG.trackY + sc(2), canvas.width, 48); 
+    
+    // 📐 2. SLOPED EMBANKMENT (Direct Connection)
+    ctx.beginPath();
+    let grd = ctx.createLinearGradient(0, CONFIG.trackY + 40, 0, canvas.height);
+    grd.addColorStop(0, '#101510');
+    grd.addColorStop(1, '#050a05');
+    ctx.fillStyle = grd;
+    
+    // Trapezoid shape - Moved higher to meet the ballast floor
+    ctx.moveTo(0, CONFIG.trackY + 40);
+    ctx.lineTo(canvas.width, CONFIG.trackY + 40);
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.lineTo(0, canvas.height);
+    ctx.fill();
+
+    // 🌿 Procedural Grass/Moss Decals
+    ctx.fillStyle = isSunset ? '#2e3a1f' : '#1a2a1a';
+    for(let i=0; i<canvas.width; i+=400) {
+        let rx = (i - (worldDistance % 400));
+        ctx.beginPath(); ctx.ellipse(rx, CONFIG.trackY + 50, 150, 40, 0, 0, Math.PI*2); ctx.fill();
+    }
 }
 
 window.onload = init;
