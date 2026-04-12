@@ -321,11 +321,11 @@ function draw() {
         let skyOff = (bgX * skyFactor) % imgSky.width;
         ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
         
-        // Robust Tiling Loop (Math.ceil + 5px overlap to kill all seams)
+        // Robust Tiling Loop (INCREASED 20px overlap to kill all seams on high-res)
         let startX = -skyOff;
         let tW = Math.ceil(imgSky.width);
         while(startX < canvas.width) {
-            ctx.drawImage(imgSky, startX, 0, tW + 5, CONFIG.trackY); 
+            ctx.drawImage(imgSky, startX, 0, tW + 20, CONFIG.trackY + 50); // Added vertical bleed
             startX += tW;
         }
         ctx.globalAlpha = 1.0;
@@ -400,12 +400,12 @@ function draw() {
         let destH = canvas.height * 0.65; // 🏔️ MAJESTIC ELEVATION (Panoramic Scale)
         let horizonY = CONFIG.trackY - destH + 20;
 
-        // 🌫️ 1. HORIZON HAZE BRIDGE (Refined for Panoramic Scale)
-        let hazeGrd = ctx.createLinearGradient(0, horizonY - 100, 0, horizonY + 50);
+        // 🌫️ 1. HORIZON HAZE BRIDGE (Deep feathered expansion)
+        let hazeGrd = ctx.createLinearGradient(0, horizonY - 200, 0, horizonY + 100);
         hazeGrd.addColorStop(0, 'rgba(0,0,0,0)');
-        hazeGrd.addColorStop(0.5, `hsla(200, 90%, ${skyBrightRaw + 10}%, 0.4)`); // Matches sky hue
+        hazeGrd.addColorStop(0.5, `hsla(200, 90%, ${skyBrightRaw + 10}%, 0.35)`); 
         hazeGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = hazeGrd; ctx.fillRect(0, horizonY - 100, canvas.width, 150);
+        ctx.fillStyle = hazeGrd; ctx.fillRect(0, horizonY - 200, canvas.width, 300);
 
         ctx.save();
         // 🎨 2. DYNAMIC HUE-MATCHING (Color Sync)
@@ -413,12 +413,12 @@ function draw() {
         else if(isSunset) ctx.filter = 'brightness(75%) sepia(50%) saturate(140%) hue-rotate(-15deg)';
         else ctx.filter = 'brightness(68%) contrast(90%) saturate(80%) sepia(20%) hue-rotate(-5deg)';
 
-        // ⛰️ 3. TILING WITH EDGE FEATHERING
+        // ⛰️ 3. TILING WITH DEEP OVERLAP
         let mountainX = -pOff;
         let tileWidth = Math.ceil(pW);
         while(mountainX < canvas.width) {
-            // Main image
-            ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, mountainX, horizonY, tileWidth + 5, destH);
+            // Main image (20px horizontal overlap + slight vertical bleed)
+            ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, mountainX, horizonY - 1, tileWidth + 20, destH + 2);
             mountainX += tileWidth;
         }
         ctx.restore();
