@@ -320,11 +320,11 @@ function draw() {
     ctx.fillStyle = skyGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // (God-rays and birds removed to match image)
-    }
+    
 
     // Parallax Layer 1: Unified Sky (Safe 'Long-Cloth' Tiling)
     if(imgSky.complete && imgSky.width > 0) {
-        let skyFactor = 0.15; 
+        let skyFactor = 0.08; 
         let skyOff = (bgX * skyFactor) % imgSky.width;
         ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
         
@@ -408,14 +408,17 @@ function draw() {
     // Parallax Layer 2: Biome Mountains/City
     let currentParallax = distKM > 100 ? imgCity : imgMountains;
     if(currentParallax && currentParallax.complete && currentParallax.width > 0) {
-        // --- UNIFIED ATMOSPHERE ENGINE (Atmospheric Fusion) ---
-        let cutY = currentParallax.height * 0.45;
-        let sH = currentParallax.height - cutY;
+        // --- EXTREME REALISM PERSPECTIVE ENGINE (V152.0) ---
+        const skyVoid = canvas.height * 0.35; // 🌌 Protected Space for Infinite Sky
         let pW = Math.max(canvas.width * 1.5, 1200); 
         let worldMultiplier = 0.15;
         let pOff = (bgX * worldMultiplier) % pW;
-        let destH = canvas.height * 0.65; // 🏔️ Panoramic Height
-        let horizonY = CONFIG.trackY - destH + 20;
+        
+        // Adaptive Mountain Height (Ensures mountains never crush the Sky-Void)
+        let destH = canvas.height - CONFIG.trackY + (canvas.height * 0.2); 
+        if (canvas.height - destH < skyVoid) destH = canvas.height - skyVoid;
+        
+        let horizonY = CONFIG.trackY - destH + 15; // Anchored with realistic 15px overlap
 
         ctx.save();
         // 🎨 2. DYNAMIC HUE-MATCHING (Color Sync)
@@ -427,18 +430,25 @@ function draw() {
         let mountainX = -pOff;
         let tileWidth = Math.ceil(pW);
         while(mountainX < canvas.width) {
-            // Draw mountain tile
-            ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, mountainX, horizonY - 1, tileWidth + 20, destH + 2);
+            // Draw mountain tile (CutY restored to classic asset level)
+            let scH = currentParallax.height * 0.55; 
+            ctx.drawImage(currentParallax, 0, currentParallax.height - scH, currentParallax.width, scH, mountainX, horizonY - 1, tileWidth + 20, destH + 2);
             
-            // Subtle Peak Softener (Feathers the very top edge of the tile)
+            // Subtle Peak Softener (Re-synced to current sky)
             let peakSoftGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 40);
-            peakSoftGrd.addColorStop(0, `hsla(200, 90%, ${skyBrightRaw + 20}%, 0.2)`);
+            peakSoftGrd.addColorStop(0, `hsla(210, 50%, 90%, 0.05)`); // Near invisible 5% haze
             peakSoftGrd.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = peakSoftGrd; ctx.fillRect(mountainX, horizonY, tileWidth + 20, 40);
             
             mountainX += tileWidth;
         }
         ctx.restore();
+
+        // 🌫️ 5. ATMOSPHERIC BRIDGE (Extreme Realism Sync - Subtle 0.1 Alpha)
+        let bridgeGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 120);
+        bridgeGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.12)' : 'rgba(210, 230, 255, 0.1)');
+        bridgeGrd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = bridgeGrd; ctx.fillRect(0, horizonY, canvas.width, 120);
 
         // ⚓ 6. GROUND ANCHORING
         let anchorGrd = ctx.createLinearGradient(0, CONFIG.trackY - 100, 0, CONFIG.trackY);
