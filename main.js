@@ -392,6 +392,8 @@ function draw() {
     let currentParallax = distKM > 100 ? imgCity : imgMountains;
     if(currentParallax && currentParallax.complete && currentParallax.width > 0) {
         // --- UNIFIED ATMOSPHERE ENGINE (Atmospheric Fusion) ---
+        let cutY = currentParallax.height * 0.45;
+        let sH = currentParallax.height - cutY;
         let pW = Math.max(canvas.width * 1.5, 1200); 
         let worldMultiplier = 0.15;
         let pOff = (bgX * worldMultiplier) % pW;
