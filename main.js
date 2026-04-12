@@ -910,12 +910,39 @@ function drawOHELines() {
     for(let i=-sc(450); i<canvas.width+sc(450); i+=sc(450)) { let px = i-poleOffset; ctx.fillStyle = '#222'; ctx.fillRect(px, CONFIG.trackY-sc(370), sc(15), sc(370)); } 
 }
 
-function drawMainTrack() { let offset = bgX % sc(40); ctx.fillStyle = "#444"; ctx.fillRect(0, CONFIG.trackY, canvas.width, sc(8)); for(let i=-sc(40); i<canvas.width+sc(40); i+=sc(40)) { ctx.fillStyle = "#6b4f3b"; ctx.fillRect(i-offset, CONFIG.trackY, sc(20), sc(6)); } ctx.fillStyle = "#aaa"; ctx.fillRect(0, CONFIG.trackY - sc(2), canvas.width, sc(2)); }
+function drawMainTrack() { 
+    let offset = bgX % sc(40); 
+    ctx.fillStyle = "#444"; ctx.fillRect(0, CONFIG.trackY, canvas.width, sc(8)); 
+    
+    // 💨 MOTION BLUR ENGINE (Sleepers)
+    let blurStrength = Math.min(speed * 0.8, sc(15));
+    for(let i=-sc(40); i<canvas.width+sc(40); i+=sc(40)) { 
+        ctx.fillStyle = "#6b4f3b"; 
+        // Draw multiple translucent layers for "motion streak" effect
+        if(speed > 2) {
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(i-offset-blurStrength, CONFIG.trackY, sc(20)+blurStrength*2, sc(6));
+            ctx.globalAlpha = 1.0;
+        }
+        ctx.fillRect(i-offset, CONFIG.trackY, sc(20), sc(6)); 
+    } 
+    ctx.fillStyle = "#aaa"; ctx.fillRect(0, CONFIG.trackY - sc(2), canvas.width, sc(2)); 
+}
 function drawForegroundGrass(yOffset = 40) { 
     let offset = (bgX * 2.5) % sc(400); 
     ctx.fillStyle = '#0a1d0a'; 
     let grassY = canvas.height + sc(yOffset) - sc(120);
-    for(let i=-sc(400); i<canvas.width+sc(400); i+=sc(250)) ctx.fillRect(i-offset, grassY, sc(80), sc(80)); 
+    
+    // 💨 MOTION BLUR ENGINE (Bushes)
+    let blurWidth = speed * sc(5);
+    for(let i=-sc(400); i<canvas.width+sc(400); i+=sc(250)) {
+        if(speed > 3) {
+            ctx.globalAlpha = 0.3;
+            ctx.fillRect(i-offset-blurWidth, grassY, sc(80)+blurWidth, sc(80));
+            ctx.globalAlpha = 1.0;
+        }
+        ctx.fillRect(i-offset, grassY, sc(80), sc(80)); 
+    }
 }
 
 function drawMegaBridge(x, width) {
