@@ -310,22 +310,21 @@ function draw() {
         skyGrd.addColorStop(0, `hsl(210, 80%, ${skyBrightRaw * (isRaining ? 0.6 : 1)}%)`); 
         skyGrd.addColorStop(1, `hsl(200, 90%, ${skyBrightRaw * (isRaining ? 0.6 : 1) + 20}%)`);
     }
-    ctx.fillStyle = skyGrd; 
-    ctx.fillRect(0, 0, canvas.width, canvas.height); // --- 1. SOLID SKY BUFFER ---
+    ctx.fillStyle = skyGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // (Celestial bodies moved to after sky parallax for depth correction)
 
-    // Parallax Layer 1: Unified Sky (Locked to ground velocity for "One Physical Structure" feel)
+    // Parallax Layer 1: Unified Sky (Safe 'Long-Cloth' Tiling)
     if(imgSky.complete && imgSky.width > 0) {
-        let skyFactor = 0.15; // 🔗 LOCKED to mountain/city speed
+        let skyFactor = 0.15; 
         let skyOff = (bgX * skyFactor) % imgSky.width;
         ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
         
-        // --- 2. DEEP CLOUD STITCHING (100px Massive Overlap) ---
+        // Robust Tiling Loop (25px overlap + Full Height Over-extension)
         let startX = -skyOff;
         let tW = Math.ceil(imgSky.width);
         while(startX < canvas.width) {
-            ctx.drawImage(imgSky, startX, -50, tW + 100, canvas.height + 250); // Massive vertical & horizontal over-extension
+            ctx.drawImage(imgSky, startX, -20, tW + 25, canvas.height + 100); 
             startX += tW;
         }
         ctx.globalAlpha = 1.0;
