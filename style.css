@@ -181,9 +181,9 @@ button {
     
     /* Dedicated Landscape Fix (V151.21) */
     @media (orientation: landscape) {
-        #gameCanvas, canvas { height: calc(100svh - 140px); }
-        #cockpit-ui { height: 140px; padding: 10px 40px; }
-        #alp-container { padding: 5px 12px; gap: 8px; }
+        #gameCanvas, canvas { height: calc(100svh - 115px); }
+        #cockpit-ui { height: 115px; padding: 5px 30px; }
+        #alp-container { padding: 4px 10px; gap: 6px; }
         #alp-avatar { width: 30px; height: 30px; }
         #signal-callout { font-size: 0.65rem; }
         #alp-name { font-size: 0.5rem; letter-spacing: 1px; }

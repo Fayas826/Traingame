@@ -12,7 +12,8 @@ const CONFIG = {
     trackY: 0,
     trainX: 450,
     maxSpeed: 11.5,
-    scrollingMultiplier: 4.8
+    scrollingMultiplier: 4.8,
+    vScale: 1.0 // 📏 Global Scaling Engine
 };
 
 let canvas, ctx, speedCanvas, sctx, speed = 0, worldDistance = 0, bgX = 0, throttle = 0, brake = 0;
@@ -118,8 +119,15 @@ function init() {
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight * 0.7;
-    CONFIG.trackY = canvas.height * 0.85;
+    
+    // 🎨 MOBILE ADAPTIVE ENGINE
+    const isMobileLocal = canvas.height < 500;
+    CONFIG.vScale = isMobileLocal ? 0.72 : 1.0;
+    CONFIG.trackY = isMobileLocal ? canvas.height * 0.78 : canvas.height * 0.85;
 }
+
+// 📏 Scaling Helper
+const sc = (val) => val * CONFIG.vScale;
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
 function spawnVolumetricCloud(x) { clouds.push({ x, y: Math.random()*250, sz: 200+Math.random()*200, op: 0.05 + Math.random()*0.1, layer: (Math.random()*2)|0 }); }
@@ -535,15 +543,15 @@ function drawSignals4Aspect() {
     signals.forEach(s => {
         let sx = s.x - worldDistance + (canvas.width / 2);
         if(sx > -100 && sx < canvas.width + 100) {
-            ctx.fillStyle = '#222'; ctx.fillRect(sx, CONFIG.trackY-350, 12, 350); 
-            ctx.fillStyle = '#111'; ctx.fillRect(sx-15, CONFIG.trackY-350, 42, 110);
+            ctx.fillStyle = '#222'; ctx.fillRect(sx, CONFIG.trackY-sc(350), sc(12), sc(350)); 
+            ctx.fillStyle = '#111'; ctx.fillRect(sx-sc(15), CONFIG.trackY-sc(350), sc(42), sc(110));
             
             // Adaptive Wire Height (PC: ~300. Mobile: ~200)
-            let wireY = (canvas.height < 500) ? CONFIG.trackY - 200 : CONFIG.trackY - 325;
+            let wireY = (canvas.height < 500) ? CONFIG.trackY - sc(200) : CONFIG.trackY - sc(325);
             
             const drawAspect = (yOff, color, active) => {
                 ctx.fillStyle = active ? color : '#333';
-                ctx.beginPath(); ctx.arc(sx+6, wireY - 10 + yOff, 10, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(sx+sc(6), wireY - sc(10) + sc(yOff), sc(10), 0, Math.PI*2); ctx.fill();
                 if(active) { ctx.shadowBlur = 15; ctx.shadowColor = color; ctx.stroke(); ctx.shadowBlur = 0; }
             };
             drawAspect(0, '#0f0', s.aspect === 'GREEN'); 
@@ -591,25 +599,25 @@ function drawSpeedometerUI() {
 }
 
 function drawRestoredTrain() {
-    // 📐 ABSOLUTE GROUNDING: Sub-pixel 1.5px drop for final contact
-    let y = CONFIG.trackY - 94; 
+    // 📐 ABSOLUTE GROUNDING
+    let y = CONFIG.trackY - sc(94); 
     // 🔗 COUPLER & CORRIDOR LOGIC
     for(let i=1; i<=4; i++) {
-        let cx = CONFIG.trainX - (i * 440);
+        let cx = CONFIG.trainX - (i * sc(440));
         drawLHBProcedural(cx, y + coachOffsets[i-1]);
-        drawCoupling(cx + 400, y + 60); // Corridor Connectors
+        drawCoupling(cx + sc(400), y + sc(60)); 
     }
     drawWAP7Procedural(CONFIG.trainX, y + coachOffsets[0]);
-    drawCoupling(CONFIG.trainX - 35, y + 65, true); // Engine Buffer
+    drawCoupling(CONFIG.trainX - sc(35), y + sc(65), true); 
 }
 
 function drawCoupling(x, y, isEngine = false) {
     ctx.fillStyle = '#111';
     if(isEngine) {
-        ctx.fillRect(x, y, 35, 15); // Buffer beam
+        ctx.fillRect(x, y, sc(35), sc(15)); 
     } else {
-        ctx.fillStyle = '#444'; ctx.fillRect(x, y - 45, 40, 75); // Corridor Vestibule
-        ctx.fillStyle = '#111'; ctx.fillRect(x, y, 40, 10); // Coupling bar
+        ctx.fillStyle = '#444'; ctx.fillRect(x, y - sc(45), sc(40), sc(75)); 
+        ctx.fillStyle = '#111'; ctx.fillRect(x, y, sc(40), sc(10)); 
     }
 }
 
@@ -622,25 +630,25 @@ function drawOppositeTrain(train) {
 }
 
 function drawWAP7Procedural(x, y) {
-    const W = 520, H = 85; 
-    drawBogie(x + 80, y + H - 15); drawBogie(x + 340, y + H - 15);
+    const W = sc(520), H = sc(85); 
+    drawBogie(x + sc(80), y + H - sc(15)); drawBogie(x + sc(340), y + H - sc(15));
     
     // Draw Pantograph Framework
-    ctx.strokeStyle = '#444'; ctx.lineWidth = 4;
+    ctx.strokeStyle = '#444'; ctx.lineWidth = sc(4);
     
     // Adaptive Wire Connectivity (Same Logic as Signals)
-    let wireHeight = (canvas.height < 500) ? CONFIG.trackY - 200 : CONFIG.trackY - 325;
-    let px = x + 380, py = y, pHeight = Math.abs(py - wireHeight); 
+    let wireHeight = (canvas.height < 500) ? CONFIG.trackY - sc(200) : CONFIG.trackY - sc(325);
+    let px = x + sc(380), py = y, pHeight = Math.abs(py - wireHeight); 
     let shudder = (speed > 5) ? (Math.random() * 4 - 2) : 0;
     
     ctx.beginPath(); 
-    ctx.moveTo(px-10, py); ctx.lineTo((px-40)+shudder, py-pHeight/2); 
+    ctx.moveTo(px-sc(10), py); ctx.lineTo((px-sc(40))+shudder, py-pHeight/2); 
     ctx.lineTo(px+shudder, py-pHeight); 
-    ctx.moveTo((px-40)+shudder, py-pHeight/2); ctx.lineTo((px+20)+shudder, py-pHeight/2); 
+    ctx.moveTo((px-sc(40))+shudder, py-pHeight/2); ctx.lineTo((px+sc(20))+shudder, py-pHeight/2); 
     ctx.stroke();
     // Contact bar on wire
-    ctx.fillStyle = '#222'; ctx.fillRect(px-30+shudder, py-pHeight-5, 60, 8);
-    ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(px, py-2, 8, 0, Math.PI*2); ctx.fill(); // Base Insulator
+    ctx.fillStyle = '#222'; ctx.fillRect(px-sc(30)+shudder, py-pHeight-sc(5), sc(60), sc(8));
+    ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(px, py-sc(2), sc(8), 0, Math.PI*2); ctx.fill(); // Base Insulator
 
     // Main Engine Body Background Gradient
     let bodyGrd = ctx.createLinearGradient(0, y, 0, y + H);
@@ -715,8 +723,8 @@ function drawWAP7Procedural(x, y) {
 }
 
 function drawLHBProcedural(x, y) {
-    const W = 400, H = 85; 
-    drawBogie(x + 40, y + H - 12); drawBogie(x + 260, y + H - 12);
+    const W = sc(400), H = sc(85); 
+    drawBogie(x + sc(40), y + H - sc(12)); drawBogie(x + sc(260), y + H - sc(12));
     
     // Rajdhani Red Scheme with Gradients
     let redGrd = ctx.createLinearGradient(0, y, 0, y + H/2);
@@ -729,18 +737,18 @@ function drawLHBProcedural(x, y) {
     
     // Corrugated Roof Lines
     ctx.strokeStyle = '#b30000'; ctx.lineWidth = 1;
-    for(let r=0; r<W; r+=8) {
-        ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + r, y + 6); ctx.stroke();
+    for(let r=0; r<W; r+=sc(8)) {
+        ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + r, y + sc(6)); ctx.stroke();
     }
     
     // Doors
-    ctx.fillStyle = '#a93226'; ctx.fillRect(x + 5, y + 8, 35, H - 16); 
-    ctx.fillRect(x + W - 40, y + 8, 35, H - 16); 
+    ctx.fillStyle = '#a93226'; ctx.fillRect(x + sc(5), y + sc(8), sc(35), H - sc(16)); 
+    ctx.fillRect(x + W - sc(40), y + sc(8), sc(35), H - sc(16)); 
     
     // Door yellow Grab-rails
     ctx.fillStyle = '#f1c40f';
-    ctx.fillRect(x + 4, y + 16, 2, 45); ctx.fillRect(x + 40, y + 16, 2, 45);
-    ctx.fillRect(x + W - 41, y + 16, 2, 45); ctx.fillRect(x + W - 5, y + 16, 2, 45);
+    ctx.fillRect(x + sc(4), y + sc(16), sc(2), sc(45)); ctx.fillRect(x + sc(40), y + sc(16), sc(2), sc(45));
+    ctx.fillRect(x + W - sc(41), y + sc(16), sc(2), sc(45)); ctx.fillRect(x + W - sc(5), y + sc(16), sc(2), sc(45));
 
     // Advanced Tinted Windows
     for(let i=0; i<8; i++) {
@@ -767,36 +775,36 @@ function drawLHBProcedural(x, y) {
 
 function drawBogie(x, y) { 
     // Bogie Frame Highlights
-    ctx.fillStyle = '#34495e'; ctx.fillRect(x, y-2, 130, 8); // Top Frame
-    ctx.fillStyle = '#111'; ctx.fillRect(x+10, y + 2, 110, 28); // Main block
+    ctx.fillStyle = '#34495e'; ctx.fillRect(x, y-sc(2), sc(130), sc(8)); // Top Frame
+    ctx.fillStyle = '#111'; ctx.fillRect(x+sc(10), y + sc(2), sc(110), sc(28)); // Main block
     
     // Central Suspension Coil Spring
     ctx.fillStyle = '#f1c40f';
-    for(let s=0; s<4; s++) { ctx.fillRect(x+55, y+6+(s*5), 20, 4); }
+    for(let s=0; s<4; s++) { ctx.fillRect(x+sc(55), y+sc(6)+(s*sc(5)), sc(20), sc(4)); }
     
     // Heavy Traction Motors (boxes between wheels)
-    ctx.fillStyle = '#2c3e50'; ctx.fillRect(x+25, y+6, 30, 18); ctx.fillRect(x+75, y+6, 30, 18);
+    ctx.fillStyle = '#2c3e50'; ctx.fillRect(x+sc(25), y+sc(6), sc(30), sc(18)); ctx.fillRect(x+sc(75), y+sc(6), sc(30), sc(18));
 
-    drawWheel(x + 25, y + 24); drawWheel(x + 105, y + 24); 
+    drawWheel(x + sc(25), y + sc(24)); drawWheel(x + sc(105), y + sc(24)); 
 }
 
 function drawWheel(x, y) { 
     ctx.save(); ctx.translate(x, y); ctx.rotate(wheelRotation); 
     // Outer Steel Flange
-    ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.fill(); 
+    ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.arc(0, 0, sc(20), 0, Math.PI*2); ctx.fill(); 
     // Inner Dark Rim
-    ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI*2); ctx.fill(); 
+    ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.arc(0, 0, sc(17), 0, Math.PI*2); ctx.fill(); 
     // Wheel Axle Core
-    ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill(); 
-    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI*2); ctx.fill(); 
+    ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(0, 0, sc(6), 0, Math.PI*2); ctx.fill(); 
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(0, 0, sc(3), 0, Math.PI*2); ctx.fill(); 
     
     // Spoke/Movement indicators
-    ctx.fillStyle = '#bdc3c7'; ctx.fillRect(-2, -15, 4, 30); ctx.fillRect(-15, -2, 30, 4);
+    ctx.fillStyle = '#bdc3c7'; ctx.fillRect(-sc(2), -sc(15), sc(4), sc(30)); ctx.fillRect(-sc(15), -sc(2), sc(30), sc(4));
     ctx.restore(); 
     
     // Static Brake Pads (do not rotate)
-    ctx.fillStyle = '#d35400'; ctx.fillRect(x - 22, y - 5, 6, 12); 
-    ctx.fillRect(x + 16, y - 5, 6, 12); 
+    ctx.fillStyle = '#d35400'; ctx.fillRect(x - sc(22), y - sc(5), sc(6), sc(12)); 
+    ctx.fillRect(x + sc(16), y - sc(5), sc(6), sc(12)); 
 }
 
 function drawTree(t) {
@@ -898,18 +906,18 @@ function drawStationProcedural(x, name) {
 }
 
 function drawOHELines() { 
-    let poleOffset = bgX % 450; 
-    let wireY = (canvas.height < 500) ? CONFIG.trackY - 200 : CONFIG.trackY - 325;
-    ctx.lineWidth = 3; ctx.strokeStyle = '#4488ff'; ctx.beginPath(); ctx.moveTo(0, wireY); ctx.lineTo(canvas.width, wireY); ctx.stroke();
-    for(let i=-450; i<canvas.width+450; i+=450) { let px = i-poleOffset; ctx.fillStyle = '#222'; ctx.fillRect(px, CONFIG.trackY-370, 15, 370); } 
+    let poleOffset = bgX % sc(450); 
+    let wireY = (canvas.height < 500) ? CONFIG.trackY - sc(200) : CONFIG.trackY - sc(325);
+    ctx.lineWidth = sc(3); ctx.strokeStyle = '#4488ff'; ctx.beginPath(); ctx.moveTo(0, wireY); ctx.lineTo(canvas.width, wireY); ctx.stroke();
+    for(let i=-sc(450); i<canvas.width+sc(450); i+=sc(450)) { let px = i-poleOffset; ctx.fillStyle = '#222'; ctx.fillRect(px, CONFIG.trackY-sc(370), sc(15), sc(370)); } 
 }
 
-function drawMainTrack() { let offset = bgX % 40; ctx.fillStyle = "#444"; ctx.fillRect(0, CONFIG.trackY, canvas.width, 8); for(let i=-40; i<canvas.width+40; i+=40) { ctx.fillStyle = "#6b4f3b"; ctx.fillRect(i-offset, CONFIG.trackY, 20, 6); } ctx.fillStyle = "#aaa"; ctx.fillRect(0, CONFIG.trackY - 2, canvas.width, 2); }
+function drawMainTrack() { let offset = bgX % sc(40); ctx.fillStyle = "#444"; ctx.fillRect(0, CONFIG.trackY, canvas.width, sc(8)); for(let i=-sc(40); i<canvas.width+sc(40); i+=sc(40)) { ctx.fillStyle = "#6b4f3b"; ctx.fillRect(i-offset, CONFIG.trackY, sc(20), sc(6)); } ctx.fillStyle = "#aaa"; ctx.fillRect(0, CONFIG.trackY - sc(2), canvas.width, sc(2)); }
 function drawForegroundGrass(yOffset = 40) { 
-    let offset = (bgX * 2.5) % 400; 
+    let offset = (bgX * 2.5) % sc(400); 
     ctx.fillStyle = '#0a1d0a'; 
-    let grassY = canvas.height + yOffset - 120;
-    for(let i=-400; i<canvas.width+400; i+=250) ctx.fillRect(i-offset, grassY, 80, 80); 
+    let grassY = canvas.height + sc(yOffset) - sc(120);
+    for(let i=-sc(400); i<canvas.width+sc(400); i+=sc(250)) ctx.fillRect(i-offset, grassY, sc(80), sc(80)); 
 }
 
 function drawMegaBridge(x, width) {
