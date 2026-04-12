@@ -315,17 +315,18 @@ function draw() {
 
     // (Celestial bodies moved to after sky parallax for depth correction)
 
-    // Parallax Layer 1: Unified Sky (Panoramic Single Pass - NO SEAMS)
+    // Parallax Layer 1: Unified Sky (Locked to ground velocity for "One Physical Structure" feel)
     if(imgSky.complete && imgSky.width > 0) {
-        let skyFactor = 0.15; 
+        let skyFactor = 0.15; // 🔗 LOCKED to mountain/city speed
         let skyOff = (bgX * skyFactor) % imgSky.width;
         ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
         
-        // --- 2. PANORAMIC CLOUD VISTA (Single Deep Draw) ---
-        // We draw wide enough to cover all horizontal shifts without tiling gaps
-        ctx.drawImage(imgSky, -skyOff, -100, imgSky.width, canvas.height + 300);
-        if (-skyOff + imgSky.width < canvas.width) {
-            ctx.drawImage(imgSky, -skyOff + imgSky.width - 2, -100, imgSky.width, canvas.height + 300);
+        // --- 2. DEEP CLOUD STITCHING (100px Massive Overlap) ---
+        let startX = -skyOff;
+        let tW = Math.ceil(imgSky.width);
+        while(startX < canvas.width) {
+            ctx.drawImage(imgSky, startX, -50, tW + 100, canvas.height + 250); // Massive vertical & horizontal over-extension
+            startX += tW;
         }
         ctx.globalAlpha = 1.0;
     }
@@ -405,18 +406,18 @@ function draw() {
         else if(isSunset) ctx.filter = 'brightness(75%) sepia(50%) saturate(140%) hue-rotate(-15deg)';
         else ctx.filter = 'brightness(68%) contrast(90%) saturate(80%) sepia(20%) hue-rotate(-5deg)';
 
-        // ⛰️ 3. MOUNTAIN-POCKET TILING (Deep Overlap)
+        // ⛰️ 3. TILING WITH EDGE FEATHERING
         let mountainX = -pOff;
         let tileWidth = Math.ceil(pW);
         while(mountainX < canvas.width) {
-            // Draw mountain tile with 200px "Safe Zone" overlap into the sky
-            ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, mountainX, horizonY - 100, tileWidth + 50, destH + 100);
+            // Draw mountain tile
+            ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, mountainX, horizonY - 1, tileWidth + 20, destH + 2);
             
-            // Subtle Peak Softener
-            let peakSoftGrd = ctx.createLinearGradient(0, horizonY - 100, 0, horizonY);
-            peakSoftGrd.addColorStop(0, `hsla(200, 90%, ${skyBrightRaw + 10}%, 0.1)`);
+            // Subtle Peak Softener (Feathers the very top edge of the tile)
+            let peakSoftGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 40);
+            peakSoftGrd.addColorStop(0, `hsla(200, 90%, ${skyBrightRaw + 20}%, 0.2)`);
             peakSoftGrd.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = peakSoftGrd; ctx.fillRect(mountainX, horizonY - 100, tileWidth + 50, 100);
+            ctx.fillStyle = peakSoftGrd; ctx.fillRect(mountainX, horizonY, tileWidth + 20, 40);
             
             mountainX += tileWidth;
         }
