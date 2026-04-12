@@ -17,12 +17,12 @@ const CONFIG = {
 };
 
 let canvas, ctx, speedCanvas, sctx, speed = 0, worldDistance = 0, bgX = 0, throttle = 0, brake = 0;
-let clouds = [], hills = [], trees = [], stations = [], signals = [], mountains = [];
-let coachOffsets = [];
+let trees = [], clouds = [], rainDrops = [], foregroundObjects = [], mountains = [], stars = [], birds = [], shootingStars = [];
+let stations = [], signals = [], coachOffsets = [];
 let timeOfDay = 0, wheelRotation = 0; 
 let audioStarted = false, hornAudio, locoAudio, slowTrackAudio, fastTrackAudio, crowdAudio;
 let lampsOn = false, lastAlpMsg = "", lastTrackSoundDist = 0;
-let oppTrain = null, rainDrops = [], isRaining = false, rainAlpha = 0;
+let oppTrain = null, isRaining = false, rainAlpha = 0;
 
 // High-Fidelity Assets & Systems
 let imgSky = new Image(); imgSky.src = 'assets/sky.png';
