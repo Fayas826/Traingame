@@ -325,7 +325,7 @@ function draw() {
         let startX = -skyOff;
         let tW = Math.ceil(imgSky.width);
         while(startX < canvas.width) {
-            ctx.drawImage(imgSky, startX, 0, tW + 20, CONFIG.trackY + 50); // Added vertical bleed
+            ctx.drawImage(imgSky, startX, 0, tW + 20, canvas.height); // Full height for solid cushion
             startX += tW;
         }
         ctx.globalAlpha = 1.0;
@@ -400,12 +400,13 @@ function draw() {
         let destH = canvas.height * 0.65; // 🏔️ MAJESTIC ELEVATION (Panoramic Scale)
         let horizonY = CONFIG.trackY - destH + 20;
 
-        // 🌫️ 1. HORIZON HAZE BRIDGE (Deep feathered expansion)
-        let hazeGrd = ctx.createLinearGradient(0, horizonY - 200, 0, horizonY + 100);
+        // 🌫️ 1. HORIZON HAZE BRIDGE (Infinite extension - No Edges)
+        let hazeGrd = ctx.createLinearGradient(0, 0, 0, horizonY + 150);
         hazeGrd.addColorStop(0, 'rgba(0,0,0,0)');
-        hazeGrd.addColorStop(0.5, `hsla(200, 90%, ${skyBrightRaw + 10}%, 0.35)`); 
+        hazeGrd.addColorStop(0.3, 'rgba(0,0,0,0)');
+        hazeGrd.addColorStop(0.7, `hsla(200, 90%, ${skyBrightRaw + 10}%, 0.3)`); 
         hazeGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = hazeGrd; ctx.fillRect(0, horizonY - 200, canvas.width, 300);
+        ctx.fillStyle = hazeGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         ctx.save();
         // 🎨 2. DYNAMIC HUE-MATCHING (Color Sync)
@@ -413,12 +414,19 @@ function draw() {
         else if(isSunset) ctx.filter = 'brightness(75%) sepia(50%) saturate(140%) hue-rotate(-15deg)';
         else ctx.filter = 'brightness(68%) contrast(90%) saturate(80%) sepia(20%) hue-rotate(-5deg)';
 
-        // ⛰️ 3. TILING WITH DEEP OVERLAP
+        // ⛰️ 3. TILING WITH EDGE FEATHERING
         let mountainX = -pOff;
         let tileWidth = Math.ceil(pW);
         while(mountainX < canvas.width) {
-            // Main image (20px horizontal overlap + slight vertical bleed)
+            // Draw mountain tile
             ctx.drawImage(currentParallax, 0, cutY, currentParallax.width, sH, mountainX, horizonY - 1, tileWidth + 20, destH + 2);
+            
+            // Subtle Peak Softener (Feathers the very top edge of the tile)
+            let peakSoftGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 40);
+            peakSoftGrd.addColorStop(0, `hsla(200, 90%, ${skyBrightRaw + 20}%, 0.2)`);
+            peakSoftGrd.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = peakSoftGrd; ctx.fillRect(mountainX, horizonY, tileWidth + 20, 40);
+            
             mountainX += tileWidth;
         }
         ctx.restore();
