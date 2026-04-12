@@ -300,7 +300,6 @@ function draw() {
     let isSunset = skyBrightRaw < 50 && skyBrightRaw > 25;
     let isNight = skyBrightRaw <= 25;
     let starOp = isNight ? 1 : (isSunset ? 0.3 : 0);
-    
     let skyGrd = ctx.createLinearGradient(0,0,0,CONFIG.trackY);
     if(isSunset) {
         skyGrd.addColorStop(0, '#2c3e50'); // Deep sunset blue
@@ -311,7 +310,8 @@ function draw() {
         skyGrd.addColorStop(0, `hsl(210, 80%, ${skyBrightRaw * (isRaining ? 0.6 : 1)}%)`); 
         skyGrd.addColorStop(1, `hsl(200, 90%, ${skyBrightRaw * (isRaining ? 0.6 : 1) + 20}%)`);
     }
-    ctx.fillStyle = skyGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = skyGrd; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height); // --- 1. SOLID SKY BUFFER ---
 
     // (Celestial bodies moved to after sky parallax for depth correction)
 
@@ -321,11 +321,11 @@ function draw() {
         let skyOff = (bgX * skyFactor) % imgSky.width;
         ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
         
-        // Robust Tiling Loop (INCREASED 20px overlap to kill all seams on high-res)
+        // --- 2. DEEP CLOUD STITCHING (100px Massive Overlap) ---
         let startX = -skyOff;
         let tW = Math.ceil(imgSky.width);
         while(startX < canvas.width) {
-            ctx.drawImage(imgSky, startX, 0, tW + 20, canvas.height); // Full height for solid cushion
+            ctx.drawImage(imgSky, startX, -50, tW + 100, canvas.height + 250); // Massive vertical & horizontal over-extension
             startX += tW;
         }
         ctx.globalAlpha = 1.0;
@@ -397,16 +397,8 @@ function draw() {
         let pW = Math.max(canvas.width * 1.5, 1200); 
         let worldMultiplier = 0.15;
         let pOff = (bgX * worldMultiplier) % pW;
-        let destH = canvas.height * 0.65; // 🏔️ MAJESTIC ELEVATION (Panoramic Scale)
+        let destH = canvas.height * 0.65; // 🏔️ Panoramic Height
         let horizonY = CONFIG.trackY - destH + 20;
-
-        // 🌫️ 1. HORIZON HAZE BRIDGE (Infinite extension - No Edges)
-        let hazeGrd = ctx.createLinearGradient(0, 0, 0, horizonY + 150);
-        hazeGrd.addColorStop(0, 'rgba(0,0,0,0)');
-        hazeGrd.addColorStop(0.3, 'rgba(0,0,0,0)');
-        hazeGrd.addColorStop(0.7, `hsla(200, 90%, ${skyBrightRaw + 10}%, 0.3)`); 
-        hazeGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = hazeGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         ctx.save();
         // 🎨 2. DYNAMIC HUE-MATCHING (Color Sync)
