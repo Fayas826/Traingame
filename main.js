@@ -29,7 +29,6 @@ let imgSky = new Image(); imgSky.src = 'assets/sky.png';
 let imgMountains = new Image(); imgMountains.src = 'assets/mountains.png';
 let imgCity = new Image(); imgCity.src = 'assets/cityscape.png';
 let particles = [];
-let stars = [], foregroundObjects = [];
 for(let i=0; i<150; i++) stars.push({x: Math.random()*3000, y: Math.random()*800, s: Math.random()*2.5 + 0.5, a: Math.random()});
 let tunnelAlpha = 0;
 let starterTimer = 7, isWaitingForStarter = true; // 🚦 7-Sec Starter State
