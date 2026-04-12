@@ -422,20 +422,20 @@ function draw() {
         }
         ctx.restore();
 
-        // 🌟 4. RIM LIGHTING BLOOM (Light Bleed over peaks)
+        // 🌟 4. RIM LIGHTING BLOOM (Cinematic Glow - SOFTENED)
         ctx.globalCompositeOperation = 'lighter';
-        let bloomGrd = ctx.createLinearGradient(0, horizonY - 40, 0, horizonY + 20);
-        bloomGrd.addColorStop(0, isSunset ? 'rgba(255, 120, 0, 0.35)' : 'rgba(180, 220, 255, 0.45)');
+        let bloomGrd = ctx.createLinearGradient(0, horizonY - 100, 0, horizonY + 50);
+        bloomGrd.addColorStop(0, isSunset ? 'rgba(255, 120, 0, 0.2)' : 'rgba(180, 220, 255, 0.25)');
         bloomGrd.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = bloomGrd; 
-        ctx.fillRect(0, horizonY - 40, canvas.width, 60);
+        ctx.fillRect(0, horizonY - 100, canvas.width, 150);
         ctx.globalCompositeOperation = 'source-over';
 
-        // 🌫️ 5. TOP-EDGE FEATHER (Erasing the sharp cutout line)
-        let featherGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 45);
-        featherGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.2)' : 'rgba(200, 230, 255, 0.25)');
+        // 🌫️ 5. ATMOSPHERIC FEATHER (Soft Horizon Mist)
+        let featherGrd = ctx.createLinearGradient(0, horizonY, 0, horizonY + 150);
+        featherGrd.addColorStop(0, isSunset ? 'rgba(200, 100, 50, 0.15)' : 'rgba(200, 230, 255, 0.15)');
         featherGrd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = featherGrd; ctx.fillRect(0, horizonY, canvas.width, 45);
+        ctx.fillStyle = featherGrd; ctx.fillRect(0, horizonY, canvas.width, 150);
 
         // ⚓ 6. GROUND ANCHORING
         let anchorGrd = ctx.createLinearGradient(0, CONFIG.trackY - 100, 0, CONFIG.trackY);
