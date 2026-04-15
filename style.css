@@ -26,8 +26,9 @@ body {
 
 #gameCanvas {
     display: block;
-    width: 100%;
+    width: 100vw;
     height: 70vh;
+    background: #000;
 }
 
 canvas {
@@ -100,19 +101,101 @@ canvas {
     position: fixed;
     bottom: 0;
     left: 0;
-    width: 100%;
+    background: linear-gradient(180deg, #1c2833 0%, #0d1217 100%);
+    border-top: 4px solid #34495e;
     height: 30vh;
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr 2fr 1fr;
+    gap: 15px;
+    padding: 15px;
+    box-sizing: border-box;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.8);
+    position: relative;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(25px);
-    border-top: 1px solid rgba(0, 255, 136, 0.2);
-    box-shadow: inset 0 20px 50px rgba(0, 255, 136, 0.03);
-    padding: 20px 60px;
-    justify-content: space-between;
+}
+
+#cockpit-ui::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at 50% 120%, rgba(0,255,136,0.05) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.cockpit-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     align-items: center;
-    z-index: 10;
+    border-right: 1px solid rgba(255,255,255,0.05);
+}
+
+.cockpit-column:last-child { border-right: none; }
+
+.ddu-screen {
+    background: #050a05;
+    width: 90%;
+    height: 85%;
+    border: 3px solid #333;
+    border-radius: 8px;
+    box-shadow: inset 0 0 20px #002200;
+    position: relative;
+    overflow: hidden;
+}
+
+#dduCanvas {
+    width: 100%;
+    height: 100%;
+}
+
+.notch-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.notch-btn {
+    width: 80px;
+    height: 45px;
+    background: linear-gradient(#444, #222);
+    border: 2px solid #555;
+    color: #00ff88;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #111;
+}
+
+.notch-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #111;
+}
+
+.notch-display {
+    background: #111;
+    color: #e67e22;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.5rem;
+    padding: 5px 15px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.button-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.button-strip button {
+    width: 100%;
+    height: 40px;
+    font-size: 0.8rem;
+    padding: 5px;
+    text-transform: uppercase;
 }
 
 .stat-group {
@@ -161,11 +244,6 @@ canvas {
 
 #throttle-liver, #brake-liver {
     width: 100%;
-}
-
-.button-strip {
-    display: flex;
-    gap: 15px;
 }
 
 button {

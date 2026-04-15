@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Realistic Train Simulator Pro | Indian Railways</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,7 +14,7 @@
                 <img id="alp-avatar" src="assets/alp.png" alt="ALP">
                 <div>
                     <div id="alp-name">Assistant Loco Pilot (ALP)</div>
-                    <div id="signal-callout">🟢 Starter signal green</div>
+                    <div id="signal-callout">🔴 Starter signal red</div>
                 </div>
             </div>
         </div>
@@ -23,27 +24,37 @@
         <canvas id="gameCanvas"></canvas>
 
         <div id="cockpit-ui">
-            <div class="stat-group">
+            <!-- ⚡ COLUMN 1: ANALOG SPEEDO -->
+            <div class="cockpit-column">
                 <div class="speed-container">
                     <canvas id="speedCanvas"></canvas>
                 </div>
             </div>
 
-            <div class="control-group">
-                <div class="lever-wrapper">
-                    <label>THROTTLE (LIVER)</label>
-                    <input type="range" id="throttle-liver" min="0" max="100" value="0">
-                </div>
-                <div class="lever-wrapper">
-                    <label>BRAKE (LIVER)</label>
-                    <input type="range" id="brake-liver" min="0" max="100" value="0">
+            <!-- 🎛️ COLUMN 2: MASTER CONTROLLER (NOTCH) -->
+            <div class="cockpit-column">
+                <label style="color: #666; font-size: 0.6rem; margin-bottom: 5px;">MASTER CONTROLLER</label>
+                <div class="notch-controls">
+                    <button class="notch-btn" onclick="window.notchUp()">NOTCH +</button>
+                    <div id="notch-val" class="notch-display">N 0</div>
+                    <button class="notch-btn" onclick="window.notchDown()">NOTCH -</button>
                 </div>
             </div>
 
-            <div class="button-strip">
-                <button onclick="window.horn()">HORN [H]</button>
-                <button class="danger" onclick="window.emergencyBrake()">EMERGENCY BRAKE [B]</button>
-                <button id="light-btn" onclick="window.toggleLights()">LIGHTS [L]</button>
+            <!-- 🖥️ COLUMN 3: DDU (DIAGNOSTIC DISPLAY UNIT) -->
+            <div class="cockpit-column">
+                <div class="ddu-screen">
+                    <canvas id="dduCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- ⌨️ COLUMN 4: COMMAND PANEL -->
+            <div class="cockpit-column">
+                <div class="button-strip">
+                    <button onclick="window.horn()">HORN [H]</button>
+                    <button id="light-btn" onclick="window.toggleLights()">LIGHTS [L]</button>
+                    <button class="danger" onclick="window.emergencyBrake()">EMERGENCY [B]</button>
+                </div>
             </div>
         </div>
     </div>

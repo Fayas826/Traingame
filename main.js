@@ -16,22 +16,59 @@ const CONFIG = {
     vScale: 1.0 // 📏 Global Scaling Engine
 };
 
-let canvas, ctx, speedCanvas, sctx, speed = 0, worldDistance = 0, bgX = 0, throttle = 0, brake = 0;
+// 🎮 CORE VARS
+let canvas, ctx, speedCanvas, sctx, dduCanvas, dctx, speed = 0, worldDistance = 0, bgX = 0;
+let throttleNotch = 0, brakeNotch = 0; // ⚙️ NOTCH SYSTEM (Final Pro)
 let trees = [], clouds = [], rainDrops = [], foregroundObjects = [], mountains = [], stars = [], mistParticles = [];
 let stations = [], signals = [], coachOffsets = [];
 let timeOfDay = 0, wheelRotation = 0; 
-let audioStarted = false, hornAudio, locoAudio, slowTrackAudio, fastTrackAudio, crowdAudio;
+let audioStarted = false, hornAudio, locoAudio, slowTrackAudio, fastTrackAudio, crowdAudio, chimeAudio, startAudio;
 let lampsOn = false, lastAlpMsg = "", lastTrackSoundDist = 0;
-let oppTrain = null, isRaining = false, rainAlpha = 0;
+let oppTrain = null, weather = 'CLEAR', rainAlpha = 0; // ⛈️ WEATHER ENGINE
+let rainAudio;
+let tunnelAlpha = 0;
+let waterOffset = 0; // 🌊 WATER PHYSICS ENGINE
 
-// High-Fidelity Assets & Systems
+// 📏 Scaling Helper (FIXED: Defined once)
+const sc = (val) => val * CONFIG.vScale;
+
+// 🎮 GAMEPLAY FLOW & MISSION STATES (FIXED: Consolidated)
+const G_STATE = {
+    RUNNING: 'RUNNING',
+    APPROACHING: 'APPROACHING',
+    STOPPED: 'STOPPED',
+    BOARDING: 'BOARDING',
+    READY: 'READY',
+    DEPARTING: 'DEPARTING'
+};
+let gameState = G_STATE.RUNNING;
+let currentStationIdx = -1;
+let dwellTimer = 0;
+let doorOpenAmount = 0; 
+let isWaitingForStarter = true;
+let starterTimer = 7.0; // 🎯 Strictly 7 Seconds 
+
+// --- 🗺️ SPATIAL WORLD MAP (Solid Ground Architecture) ---
+// Defined in World Units (Meters)
+const BRIDGE_ZONES = [
+    { start: 20000, end: 32000, type: 'STEEL' },   // First Long Valley (Steel)
+    { start: 55000, end: 68000, type: 'WATER' },   // Lake Crossing (Proposed Concrete 🔥)
+    { start: 105000, end: 115000, type: 'STEEL' }, // Deep Forest River (Steel)
+    { start: 140000, end: 155000, type: 'STEEL' }, // High Ghat Pass (Steel)
+    { start: 185000, end: 195000, type: 'WATER' }  // Final Coastal Bridge (Water)
+];
+
+const getStructuralType = (worldX) => {
+    const zone = BRIDGE_ZONES.find(z => worldX >= z.start && worldX <= z.end);
+    return zone ? { main: 'bridge', sub: zone.type } : { main: 'ground' };
+};
+
+// High-Fidelity Assets
 let imgSky = new Image(); imgSky.src = 'assets/sky.png';
 let imgMountains = new Image(); imgMountains.src = 'assets/mountains.png';
 let imgCity = new Image(); imgCity.src = 'assets/cityscape.png';
 let particles = [];
 for(let i=0; i<150; i++) stars.push({x: Math.random()*3000, y: Math.random()*800, s: Math.random()*2.5 + 0.5, a: Math.random()});
-let tunnelAlpha = 0;
-let starterTimer = 7, isWaitingForStarter = true; // 🚦 7-Sec Starter State
 
 function init() {
     canvas = document.getElementById(CONFIG.canvasId);
@@ -42,72 +79,127 @@ function init() {
     speedCanvas.width = 120;
     speedCanvas.height = 120;
 
+    dduCanvas = document.getElementById("dduCanvas");
+    dctx = dduCanvas.getContext("2d");
+    dduCanvas.width = 300;
+    dduCanvas.height = 150;
+
     resize();
     window.addEventListener('resize', resize);
 
     hornAudio = new Audio('assets/P5.mp3'); 
     locoAudio = new Audio('assets/humming.mp3'); 
-    locoAudio.loop = true;
+    locoAudio.loop = false; // 🔊 NO LOOPING (Final Pro Fix)
     slowTrackAudio = new Audio('assets/short.mp3');
     fastTrackAudio = new Audio('assets/long.mp3');
     crowdAudio = new Audio('assets/crowd.mp3');
     crowdAudio.loop = true;
     crowdAudio.volume = 0;
 
+    rainAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2407/2407-preview.mp3'); 
+    rainAudio.loop = true;
+    rainAudio.volume = 0;
+    
+    // Final Plus Audio Pack
+    chimeAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'); // IR Chime Placeholder
+    startAudio = new Audio('assets/humming.mp3'); // We'll use humming specifically for the start sequence
+
     for(let i=0; i<4; i++) coachOffsets.push(0); 
     for(let i=0; i<12; i++) spawnMountain();
     for(let i=0; i<20; i++) spawnVolumetricCloud(Math.random() * canvas.width);
-    for(let i=0; i<100; i++) rainDrops.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: 10 + Math.random()*15 });
+    
+    // Layered 3D Rain (FIXED)
+    for(let i=0; i<200; i++) {
+        rainDrops.push({ 
+            x: Math.random()*canvas.width, 
+            y: Math.random()*canvas.height, 
+            s: 10 + Math.random()*15,
+            layer: Math.random() < 0.3 ? 'front' : 'back' 
+        });
+    }
     for(let i=0; i<50; i++) mistParticles.push({ x: Math.random()*2000, y: CONFIG.trackY - 250 + Math.random()*200, sz: 50+Math.random()*150, dx: 0.2 + Math.random()*0.4 });
     
-    // 🚉 6-STATION EXPANSION (CLIENT SPEC 6)
-    stations.push({ name: "KOLLAM JCT", x: 0, annDone: false });
-    stations.push({ name: "PARAVUR", x: 40000, annDone: false });
-    stations.push({ name: "VARKALA SIVAGIRI", x: 80000, annDone: false });
-    stations.push({ name: "KADAKKAVUR", x: 120000, annDone: false });
-    stations.push({ name: "CHIRAYINKEEZHU", x: 160000, annDone: false });
-    stations.push({ name: "TRIVANDRUM CENTRAL", x: 200000, annDone: false });
+    // 🚉 6-STATION MISSION (Kollam -> TVC)
+    stations.push({ id: 'STAT_0', name: "KOLLAM JCT", x: 0, annDone: false, isStarter: true });
+    stations.push({ id: 'STAT_1', name: "PARAVUR", x: 40000, annDone: false });
+    stations.push({ id: 'STAT_2', name: "VARKALA SIVAGIRI", x: 80000, annDone: false });
+    stations.push({ id: 'STAT_3', name: "KADAKKAVUR", x: 120000, annDone: false });
+    stations.push({ id: 'STAT_4', name: "CHIRAYINKEEZHU", x: 160000, annDone: false });
+    stations.push({ id: 'STAT_5', name: "TRIVANDRUM CENTRAL", x: 200000, annDone: false });
 
-    // 🚦 MASTER SIGNAL SEQUENCE (CLIENT SPEC 3)
-    // First 400m is the Starter Signal
+    // 🚦 SIGNAL SEQUENCE
     const seq = ['GREEN', 'GREEN', 'GREEN', 'YELLOW', 'DOUBLE_YELLOW', 'YELLOW', 'RED'];
-    for(let i=0; i<150; i++) {
-        let aspect = seq[i % seq.length];
-        if(i < 1) aspect = 'RED'; // Starter
-        signals.push({ x: 800 + i * 4000, aspect: aspect });
+    for(let j=0; j<150; j++) {
+        let aspect = seq[j % seq.length];
+        let sigX = 800 + j * 4000;
+        
+        // 🚉 NEW: Tag signals near ANY station exit as Starters
+        let isStart = stations.some(s => sigX > s.x && sigX < s.x + 2000);
+        if(isStart) aspect = 'RED'; 
+
+        signals.push({ 
+            id: `SIG_${j}`, 
+            x: sigX, 
+            aspect: aspect, 
+            isStarter: isStart 
+        });
     }
+
+    // ⏱️ WEATHER TRANSITION (Strict Distance-Based Logic - No Randomness)
+    // Removed setInterval random weather to prevent confusion.
 
     window.startMobileAudio = () => {
         audioStarted = true;
         document.getElementById('start-overlay').style.display = 'none';
-        locoAudio.play().catch(()=>{});
-        speakALP("Waiting for signal"); // Initial ALP Callout
+        // locoAudio.play() removed here to ensure silence during wait
+        speakALP("Waiting for signal");
         if (navigator.vibrate) navigator.vibrate(50);
     };
 
-    document.getElementById('throttle-liver').addEventListener('input', (e) => {
-        if(isWaitingForStarter) { e.target.value = 0; return; }
-        throttle = e.target.value / 100; if(throttle > 0) brake = 0;
-        document.getElementById('brake-liver').value = 0;
-    });
-    document.getElementById('brake-liver').addEventListener('input', (e) => {
-        brake = e.target.value / 100; if(brake > 0) throttle = 0;
-        document.getElementById('throttle-liver').value = 0;
-    });
+    // ⚙️ NOTCH CONTROL SYSTEM (Pro Logic Refined)
+    window.notchUp = () => {
+        if(isWaitingForStarter || gameState === G_STATE.BOARDING) return;
+        
+        // ⚡ QUICK RELEASE (Pro Logic): If in Emergency (B5), one click takes us to Neutral (N0)
+        if (brakeNotch === 5 && speed === 0) {
+            brakeNotch = 0;
+        } else if (brakeNotch > 0) {
+            brakeNotch--;
+        } else if (throttleNotch < 8) {
+            throttleNotch++;
+        }
+        updateDashboard();
+        if (navigator.vibrate) navigator.vibrate(30);
+    };
 
-    window.horn = () => { if(hornAudio) { hornAudio.currentTime = 0; hornAudio.play(); } if(navigator.vibrate) navigator.vibrate(200); };
-    window.toggleLights = () => { lampsOn = !lampsOn; document.getElementById('light-btn').classList.toggle('active', lampsOn); if(navigator.vibrate) navigator.vibrate(20); };
-    window.emergencyBrake = () => { brake = 1; throttle = 0; updateLivers(); if(navigator.vibrate) navigator.vibrate([100, 50, 100]); };
+    window.notchDown = () => {
+        // Notch - first reduces power, then applies brakes
+        if (throttleNotch > 0) {
+            throttleNotch--;
+        } else if (brakeNotch < 5) {
+            brakeNotch++;
+        }
+        updateDashboard();
+        if (navigator.vibrate) navigator.vibrate(20);
+    };
+
+    window.horn = () => { if(hornAudio) { hornAudio.currentTime = 0; hornAudio.play(); } };
+    window.toggleLights = () => { lampsOn = !lampsOn; document.getElementById('light-btn').classList.toggle('active', lampsOn); };
+    window.emergencyBrake = () => { brakeNotch = 5; throttleNotch = 0; updateDashboard(); speakALP("Emergency Brake Applied!"); };
+
+    // 📱 HYBRID TOUCH CONTROLS (Updated for Notches)
+    const handleTouch = (clientX) => {
+        if (clientX < window.innerWidth / 2) window.notchDown();
+        else window.notchUp();
+    };
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(e.touches[0].clientX); }, {passive: false});
+    canvas.addEventListener('mousedown', (e) => { if(audioStarted) handleTouch(e.clientX); });
 
     window.addEventListener('keydown', e => {
-        if(!audioStarted) return;
+        if(!audioStarted || isWaitingForStarter || gameState === G_STATE.BOARDING) return;
         const key = e.key.toLowerCase();
-        if(isWaitingForStarter) return; // Block movement during starter wait
-        
-        if (e.key === 'ArrowUp') { throttle = Math.min(throttle + 0.1, 1.0); brake = 0; updateLivers(); }
-        if (e.key === 'ArrowDown') { throttle = Math.max(throttle - 0.1, 0); updateLivers(); }
-        if (key === 'w') { brake = Math.max(brake - 0.05, 0); updateLivers(); }
-        if (key === 's') { brake = Math.min(brake + 0.05, 1); throttle = 0; updateLivers(); }
+        if (e.key === 'ArrowUp') window.notchUp();
+        if (e.key === 'ArrowDown') window.notchDown();
         if (key === 'b') window.emergencyBrake();
         if (key === 'h') window.horn();
         if (key === 'l') window.toggleLights();
@@ -119,15 +211,10 @@ function init() {
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight * 0.7;
-    
-    // 🎨 MOBILE ADAPTIVE ENGINE (Aggressive 60% Scaling)
     const isMobileLocal = canvas.height < 500;
-    CONFIG.vScale = isMobileLocal ? 0.60 : 0.88; // 🖥️ Harmonized PC Scale
+    CONFIG.vScale = isMobileLocal ? 0.60 : 0.88; 
     CONFIG.trackY = isMobileLocal ? canvas.height * 0.70 : canvas.height * 0.85;
 }
-
-// 📏 Scaling Helper
-const sc = (val) => val * CONFIG.vScale;
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
 function spawnVolumetricCloud(x) { clouds.push({ x, y: Math.random()*(canvas.height * 0.4), sz: sc(200)+Math.random()*sc(200), op: 0.05 + Math.random()*0.1, layer: (Math.random()*2)|0 }); }
@@ -142,9 +229,9 @@ function spawnTreeLayered() {
     }
 }
 
-function updateLivers() {
-    document.getElementById('throttle-liver').value = throttle * 100;
-    document.getElementById('brake-liver').value = brake * 100;
+function updateDashboard() {
+    document.getElementById('notch-val').innerText = `N ${throttleNotch}`;
+    if (brakeNotch > 0) document.getElementById('notch-val').innerText = `B ${brakeNotch}`;
 }
 
 function speakALP(text) {
@@ -154,30 +241,113 @@ function speakALP(text) {
     window.speechSynthesis.speak(u);
 }
 
-function gameLoop() { update(); draw(); drawSpeedometerUI(); requestAnimationFrame(gameLoop); }
+function gameLoop() { update(); draw(); drawSpeedometerUI(); drawDDUDisplay(); requestAnimationFrame(gameLoop); }
 
 function update() {
-    // 🚦 STARTER SIGNAL TIMER (7 SECONDS)
-    if(audioStarted && isWaitingForStarter) {
-        starterTimer -= 0.016;
-        if(starterTimer <= 0) {
-            isWaitingForStarter = false;
-            signals[0].aspect = 'GREEN';
-            speakALP("Starter signal green");
+    // 🚦 MISSION & STATION LOGIC (Final Client Loop)
+    let distFromStation = 999999;
+    let nearestStation = null;
+    let nearestIdx = -1;
+    stations.forEach((s, i) => { 
+        let d = s.x - worldDistance; 
+        if(Math.abs(d) < Math.abs(distFromStation)) { distFromStation = d; nearestStation = s; nearestIdx = i; } 
+    });
+
+    // 🚉 APPROACHING & STOPPING LOGIC
+    if (Math.abs(distFromStation) < 1500 && gameState === G_STATE.RUNNING) {
+        gameState = G_STATE.APPROACHING;
+        speakALP(`Approaching ${nearestStation.name}. Reduce throttle.`);
+    }
+
+    if (gameState === G_STATE.APPROACHING) {
+        // Auto-Slow Assist: If speed > 5 and player not braking, apply soft brakes
+        if (Math.abs(distFromStation) < 800 && speed > 5 && brakeNotch === 0) {
+             speed *= 0.98; // Soft programmatic brake
+        }
+        // 🏁 PRO-DOCKING (Final Sync Fix): Increased radius (150m) + Snap-to-Stop
+        if (Math.abs(distFromStation) < 150 && speed < 1.0) {
+            speed = 0;
+            gameState = G_STATE.STOPPED;
+            currentStationIdx = nearestIdx;
+            speakALP(`Train stopped at ${nearestStation.name}. Opening doors.`);
         }
     }
 
-    timeOfDay = (timeOfDay + 0.04) % 1000;
+    // 🚪 DOOR & BOARDING SEQUENCE
+    if (gameState === G_STATE.STOPPED) {
+        if (doorOpenAmount === 0) speakALP("Opening doors.");
+        doorOpenAmount = Math.min(doorOpenAmount + 0.02, 1);
+        if (doorOpenAmount >= 1) {
+            gameState = G_STATE.BOARDING;
+            dwellTimer = 400; // ~6-7 seconds of boarding
+        }
+    }
+
+    if (gameState === G_STATE.BOARDING) {
+        dwellTimer--;
+        if (dwellTimer <= 0) {
+            gameState = G_STATE.READY;
+            speakALP("Boarding complete. Closing doors.");
+            if(chimeAudio) chimeAudio.play().catch(()=>{}); 
+        }
+    }
+
+    if (gameState === G_STATE.READY) {
+        doorOpenAmount = Math.max(doorOpenAmount - 0.02, 0);
+        if (doorOpenAmount <= 0) { gameState = G_STATE.DEPARTING; currentStationIdx = -1; }
+    }
+
+    // 🚦 STARTER SIGNAL LOGIC (Hard Sync & 7s Timer Fix 🔥)
+    if(audioStarted && isWaitingForStarter) {
+        starterTimer -= 0.016;
+        speed = 0; // Hard lock: No movement until green
+        
+        // 🎯 1. PRE-FLIP: Signal turns Green 2 seconds before departure
+        if(starterTimer <= 2.0) {
+            let starterSig = signals.find(s => s.isStarter && s.x > worldDistance);
+            if(starterSig && starterSig.aspect !== 'GREEN') {
+                starterSig.aspect = 'GREEN';
+                document.getElementById('signal-callout').innerHTML = "🟢 Starter signal green";
+            }
+        }
+
+        // 🎯 2. DEPARTURE: Timer ends
+        if(starterTimer <= 0) {
+            isWaitingForStarter = false;
+            speakALP("Starter signal green. You are cleared to depart.");
+            if (gameState === G_STATE.DEPARTING) gameState = G_STATE.RUNNING;
+        }
+    }
+
+    // Departure Signal Sync
+    if (gameState === G_STATE.DEPARTING && !nearestStation?.isStarter) {
+        let nextSignal = signals.find(sig => sig.x > worldDistance);
+        if (nextSignal && nextSignal.aspect === 'GREEN') {
+            gameState = G_STATE.RUNNING;
+            speakALP("Permission to depart.");
+        } else if (nextSignal && nextSignal.aspect === 'RED') {
+            // Wait for signal or force green after dwell if it's a mission stop
+            nextSignal.aspect = 'GREEN'; 
+        }
+    }
+
+    // ☀️ DYNAMIC ATMOSPHERE (Predictable & Cinematic)
+    // We slow down time: Night only appears in the final stretch of the trip
+    timeOfDay = (0.3 * worldDistance / 1000) % 1000; 
+    const isSunset = timeOfDay > 600 && timeOfDay < 800;
+    const isNight = timeOfDay >= 800 || timeOfDay < 100;
+    
     let distKM = worldDistance / 1000;
-    isRaining = (distKM > 30 && distKM < 50) || (distKM > 130 && distKM < 150);
+    // Storm only in specific Ghat sections (Long stretches)
+    isRaining = (distKM > 60 && distKM < 100) || (distKM > 220); 
+    weather = isRaining ? 'RAIN' : 'CLEAR';
     rainAlpha = isRaining ? Math.min(rainAlpha + 0.01, 0.6) : Math.max(rainAlpha - 0.01, 0);
 
-    // Tunnel bounds logic
-    if ((distKM > 60 && distKM < 62) || (distKM > 90 && distKM < 92) || (distKM > 120 && distKM < 121)) {
-        tunnelAlpha = Math.min(tunnelAlpha + 0.02, 1.0);
-    } else {
-        tunnelAlpha = Math.max(tunnelAlpha - 0.02, 0);
-    }
+    // Rain Particle Lifecycle
+    rainDrops.forEach(r => {
+        r.y += r.s + (isRaining ? speed : 0);
+        if(r.y > canvas.height) { r.y = -20; r.x = Math.random()*canvas.width; }
+    });
     
     // Twinkle stars
     stars.forEach(s => {
@@ -201,23 +371,74 @@ function update() {
         }
     });
 
-    let traction = isRaining ? 0.65 : 1.0;
-    let friction = 0.003 + (speed * 0.001);
-    // ⚡ PROPORTIONAL THROTTLE: Speed now scales with Lever position (V151.6/V151.8)
-    let power = (throttle * throttle * 0.04 * traction); 
-    // ⚡ MOMENTUM BRAKING: Heavy mass deceleration (V151.7)
-    let brakeForce = (brake * 0.004); 
-    speed += (power - brakeForce - friction);
-    // ⚡ REALISTIC MOMENTUM: Only cap speed if accelerating, allow smooth coasting (V151.9)
-    if(speed > CONFIG.maxSpeed * throttle && throttle > 0.1) {
-        speed = Math.max(speed - 0.005, CONFIG.maxSpeed * throttle); 
+    // ⛈️ WEATHER SYSTEM SYNC (Final Pro)
+    let targetRain = (weather === 'RAIN' || weather === 'STORM') ? 1.0 : 0.0;
+    rainAlpha += (targetRain - rainAlpha) * 0.01;
+    
+    if (audioStarted && rainAudio) {
+        let targetVol = (weather === 'RAIN') ? 0.3 : (weather === 'STORM' ? 0.6 : 0);
+        rainAudio.volume += (targetVol - rainAudio.volume) * 0.01;
+        if (rainAlpha > 0.01 && rainAudio.paused) rainAudio.play().catch(()=>{});
     }
     
-    if(throttle < 0.05 && speed > 0) speed -= 0.002; // Natural air friction/coasting
+    // 🔊 CROWD AUDIO SYNC (Vibrant Station Ambience)
+    if(audioStarted && crowdAudio) {
+        let isNear = isAtStation(worldDistance);
+        let targetCrowdVol = isNear ? 0.4 : 0;
+        crowdAudio.volume += (targetCrowdVol - crowdAudio.volume) * 0.05;
+        if(crowdAudio.volume > 0.01 && crowdAudio.paused) crowdAudio.play().catch(()=>{});
+    }
+
+    let traction = (weather === 'RAIN' || weather === 'STORM') ? 0.65 : 1.0;
+    let friction = 0.003 + (speed * 0.001);
+    
+    // ⚙️ NOTCH-BASED PHYSICS (Pro Logic)
+    // Traction power scales with notch (0-8)
+    let power = (throttleNotch * 0.006 * traction); 
+    // Braking force scales with notch (0-5)
+    let brakeForce = (brakeNotch * 0.008); 
+    
+    speed += (power - brakeForce - friction);
+    
+    // 🧠 AWS COORDINATE SYNC (Fixed Offset Parity)
+    let nextSignal = signals.find(sig => sig.x > worldDistance);
+    if (nextSignal) {
+        // We sync the physics distance with the VISUAL distance: (canvas.width / 2) - CONFIG.trainX
+        const visualOffset = (canvas.width / 2) - CONFIG.trainX;
+        let distToSignalVisual = nextSignal.x - worldDistance + visualOffset;
+        
+        // AWS triggers when the visual light is within 500m of the FRONT of the train
+        if (distToSignalVisual < 500 && distToSignalVisual > -100) {
+            if (nextSignal.aspect === 'RED' && speed > 0.1) {
+                window.emergencyBrake();
+            } else if (nextSignal.aspect === 'YELLOW' && speed > 6) {
+                if (Math.random() < 0.01) speakALP("Caution! Check speed.");
+            }
+        }
+    }
+
+    if(speed > CONFIG.maxSpeed && throttleNotch > 6) {
+        speed = Math.max(speed - 0.005, CONFIG.maxSpeed); 
+    }
+    
+    if(throttleNotch === 0 && speed > 0) speed -= 0.001; // Natural coasting
     speed = Math.max(0, Math.min(speed, CONFIG.maxSpeed));
     worldDistance += speed;
     bgX = (worldDistance * CONFIG.scrollingMultiplier);
     wheelRotation += speed * 0.45;
+
+    // 🔥 SMOKE EFFECT SPAWNING (CLIENT WOW)
+    if (speed > 1 && Math.random() < 0.15) {
+        particles.push({
+            x: CONFIG.trainX + 380, 
+            y: CONFIG.trackY - 330, 
+            vx: -speed * 0.8 - Math.random() * 2, 
+            vy: -1 - Math.random() * 2, 
+            type: 'smoke', 
+            a: 0.5, 
+            sz: 10 + Math.random() * 20
+        });
+    }
 
     // 🚆 OPPOSITE TRAFFIC
     if(!oppTrain && Math.random() < 0.003 && speed > 5) oppTrain = { x: canvas.width + 1000, speed: 18, coachCount: 15 };
@@ -228,16 +449,47 @@ function update() {
 
     coachOffsets.forEach((_, i) => coachOffsets[i] = Math.sin(Date.now()/(130 + i*15)) * (speed * 0.45));
     
-    // 🔊 AUDIO ENGINE
-    if(audioStarted && locoAudio) {
-        let atStation = isAtStation(worldDistance);
-        if(atStation && speed > 0.1 && speed < 5) {
-            if(!window.hummingActive) { window.hummingActive = true; window.hummStartTime = Date.now(); locoAudio.currentTime = 0; locoAudio.play(); }
-            let elapsed = (Date.now() - window.hummStartTime) / 1000;
-            if(elapsed < 5) locoAudio.volume = Math.min(0.45, (5 - elapsed) / 5);
-            else { locoAudio.volume = 0; if(!locoAudio.paused) locoAudio.pause(); }
-        } else if (speed === 0 || speed >= 5 || !atStation) {
-            window.hummingActive = false; locoAudio.volume = 0; if(!locoAudio.paused) locoAudio.pause();
+    // 🔊 AUDIO ENGINE (Soundscape Restore 🔥)
+    if(audioStarted) {
+        // 1. STATION WHOOPING (Humming Engine)
+        // Checks if within 1.5km of ANY station to ensure full 7s takeoff cycle
+        let isNearStation = stations.some(s => Math.abs(worldDistance - s.x) < 1500);
+        let isTakingOff = (gameState === G_STATE.DEPARTING || gameState === G_STATE.RUNNING) && isNearStation;
+        
+        if(isTakingOff && speed > 0.1) {
+            if(!window.hummingActive && speed < 2.0) { 
+                window.hummingActive = true; 
+                window.hummStartTime = Date.now(); 
+                locoAudio.currentTime = 0; 
+                locoAudio.play().catch(()=>{}); 
+            }
+            if (window.hummingActive) {
+                let elapsed = (Date.now() - window.hummStartTime) / 1000;
+                if(elapsed < 7.0 && speed > 0.1) {
+                    locoAudio.volume = Math.max(0, 0.6 * (1 - elapsed / 7.0)); 
+                } else {
+                    locoAudio.volume = 0;
+                    if(!locoAudio.paused) locoAudio.pause();
+                    window.hummingActive = false;
+                }
+            }
+        } else {
+            if(window.hummingActive) {
+                locoAudio.volume = 0; if(!locoAudio.paused) locoAudio.pause(); window.hummingActive = false;
+            }
+        }
+
+        // 2. RHYTHMIC TRACK JOINTS ("Clack-Clack")
+        if(speed > 0.5) {
+            let jointInterval = speed > 5 ? 380 : 750; // Closer together at high speed
+            if (worldDistance - lastTrackSoundDist > jointInterval) {
+                let trackSound = speed > 5 ? fastTrackAudio : slowTrackAudio;
+                if(trackSound.paused || trackSound.ended) {
+                    trackSound.volume = Math.min(0.4, speed / 25);
+                    trackSound.play().catch(()=>{});
+                    lastTrackSoundDist = worldDistance;
+                }
+            }
         }
         
         // Crowd Proximity Audio
@@ -245,7 +497,7 @@ function update() {
         stations.forEach(s => { let d = Math.abs(worldDistance - s.x); if(d < nearestDist) nearestDist = d; });
         if(nearestDist < 4000 && crowdAudio) {
             let targetVol = 1.0 - (nearestDist / 4000);
-            crowdAudio.volume = Math.max(0, Math.min(1, targetVol));
+            crowdAudio.volume = Math.max(0, Math.min(0.6, targetVol));
             if(crowdAudio.paused) crowdAudio.play().catch(()=>{});
         } else if (crowdAudio) {
             crowdAudio.volume = 0;
@@ -260,12 +512,12 @@ function update() {
     // Unified Background Velocity (Locked at 0.72 to match 4.8 * 0.15 parallax)
     clouds.forEach(c => { c.x -= speed * 0.72; if(c.x < -600) c.x = canvas.width + 600; });
 
-    // 🔥 DYNAMIC PARTICLE PHYSICS
-    if (throttle > 0.7 && speed > 2 && Math.random() < 0.2) {
+    // 🔥 DYNAMIC PARTICLE PHYSICS (Final Pro Fix)
+    if (throttleNotch >= 6 && speed > 2 && Math.random() < 0.2) {
         // Pantograph blue/white sparks
         particles.push({x: CONFIG.trainX + 380, y: CONFIG.trackY - 325 - Math.random()*10, vx: -speed*0.5 - Math.random()*2, vy: (Math.random()-0.5)*2, type: 'spark', a: 1.0, c: '#aaddff'});
     }
-    if (brake > 0.5 && speed > 3) {
+    if (brakeNotch >= 3 && speed > 3) {
         // High friction brake sparks at the front wheels
         for(let z=0; z<3; z++) {
             particles.push({x: CONFIG.trainX + 80 + Math.random()*20, y: CONFIG.trackY - 10, vx: -speed*1.2 - Math.random()*5, vy: -Math.random()*4, type: 'fire', a: 1.0, c: Math.random() > 0.5 ? '#ff5500' : '#ff9900'});
@@ -274,6 +526,11 @@ function update() {
     particles.forEach((p, i) => {
         p.x += p.vx; p.y += p.vy;
         if(p.type === 'spark') { p.a -= 0.05; }
+        if(p.type === 'smoke') { 
+            p.a -= 0.01; 
+            p.sz += 0.5; 
+            p.vx *= 0.98; // Drag
+        }
         if(p.type === 'fire') { p.a -= 0.08; p.vy += 0.2; } // gravity
         if(p.a <= 0) particles.splice(i, 1);
     });
@@ -290,7 +547,7 @@ function update() {
     });
     stations.forEach(s => {
         let dist = s.x - worldDistance;
-        if(dist > 0 && dist < 1500) msg = `📢 Entering ${s.name}`;
+        if(dist > 0 && dist < 5000) msg = `📢 Entering ${s.name}`;
     });
     if(msg !== lastAlpMsg) {
         lastAlpMsg = msg;
@@ -301,8 +558,19 @@ function update() {
 
 function draw() {
     ctx.save();
-    let skyBrightRaw = Math.abs(500 - timeOfDay) / 5;
+    
+    // 🚉 BIOME & TERRAIN DETECTION (Refined Spatial Logic 🔥)
+    let distSinceLast = 1000000;
+    stations.forEach(s => { let d = worldDistance - s.x; if(d >= 0 && d < distSinceLast) distSinceLast = d; });
+    let isGhatMode = distSinceLast < 30000; 
+    
+    // Check structural type at the front of the train
+    let sType = getStructuralType(worldDistance + 400);
+    let isBridgeBiome = sType.main === 'bridge';
+    let bridgeSubtype = sType.sub || 'NONE'; // STEEL or WATER
     let distKM = worldDistance / 1000;
+
+    let skyBrightRaw = Math.abs(500 - timeOfDay) / 5;
     
     // Day/Night & Sunset Logic
     let isSunset = skyBrightRaw < 50 && skyBrightRaw > 25;
@@ -323,31 +591,11 @@ function draw() {
         // (God-rays and birds removed to match image)
     
 
-    // Parallax Layer 1: Unified Sky (Safe 'Seam-Buster' Tiling)
+    // --- 1. FULL CANVAS SKY RENDER (FIXED CUT LINE) ---
     if(imgSky.complete && imgSky.width > 0) {
-        let skyFactor = 0.08; 
-        let skyOff = (bgX * skyFactor) % imgSky.width;
         ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
-        
-        // --- 1. SEAM-BUSTER ENGINE (Safety Blending For 0-Seam Sky) ---
-        let startX = -skyOff;
-        let tW = Math.ceil(imgSky.width);
-        while(startX < canvas.width) {
-            // Base Tile Draw
-            ctx.drawImage(imgSky, startX, -20, tW + 5, canvas.height + 100); 
-            
-            // 🩹 Safety Healing (Feathered Alpha Overlap - No Shadows)
-            if (startX + tW < canvas.width + 150) {
-                let sRect = 150; 
-                ctx.save();
-                ctx.globalAlpha *= 0.4; // Soft overlap blend
-                ctx.drawImage(imgSky, 0, 0, sRect, imgSky.height, startX + tW - sRect/2, -20, sRect, canvas.height + 100);
-                ctx.restore();
-                
-                ctx.globalAlpha = isNight ? 0.3 : (isSunset ? 0.8 : 1.0);
-            }
-            startX += tW;
-        }
+        // Draw sky slightly taller to prevent any gaps at the horizon
+        ctx.drawImage(imgSky, 0, -2, canvas.width, canvas.height + 4); 
         ctx.globalAlpha = 1.0;
     }
 
@@ -408,18 +656,19 @@ function draw() {
         }
     });
 
-    // Parallax Layer 2: Biome Mountains/City
-    let currentParallax = distKM > 100 ? imgCity : imgMountains;
+    // Parallax Layer 2: Biome Mountains/City (Sync Filter Fix 🔥)
+    // If we are on a bridge, we force the remote mountain biome for realism
+    let currentParallax = (isBridgeBiome || distKM <= 100) ? imgMountains : imgCity;
     if(currentParallax && currentParallax.complete && currentParallax.width > 0) {
         // --- EXTREME REALISM PERSPECTIVE ENGINE (V152.0) ---
         const skyVoid = canvas.height * 0.35; // 🌌 Protected Space for Infinite Sky
         let pW = Math.max(canvas.width * 1.5, 1200); 
         
-        // --- 🌊 ULTIMATE REALISM: DUAL-PASS DEPTH ENGINE (V17.0) ---
+        // --- 🌊 ULTIMATE REALISM: DUAL-PASS DEPTH ENGINE (PRO FIX: 0.2 SPEED) ---
         const drawPlane = (passType) => {
             let config = {
-                far: { speed: 0.055, blur: 2.2, bright: 75, scale: 0.38, overlap: 35 },
-                mid: { speed: 0.095, blur: 1.2, bright: 85, scale: 0.45, overlap: 25 }
+                far: { speed: 0.2, blur: 2.2, bright: 75, scale: 0.38, overlap: 35 },
+                mid: { speed: 0.35, blur: 1.2, bright: 85, scale: 0.45, overlap: 25 }
             }[passType];
 
             let pOff = (bgX * config.speed) % pW;
@@ -504,65 +753,89 @@ function draw() {
 
     trees.filter(t => t.layer === 2).forEach(drawTree);
 
-    let distSinceLast = 1000000;
-    stations.forEach(s => { let d = worldDistance - s.x; if(d >= 0 && d < distSinceLast) distSinceLast = d; });
-    let isGhatMode = distSinceLast < 30000; // 30km High-Altitude Departure
+    // 🌳 TREES (MID LAYER: 0.5 SPEED)
+    // Hide trees if on a bridge to keep it clean
+    if (!isBridgeBiome) {
+        trees.forEach(drawTree);
+    }
 
-    // 🌍 PROCEDURAL TERRAIN SWITCHER (Rare Bridges vs. Solid Ground)
-    let terrainToggle = Math.sin(worldDistance / 6000); 
-    let isBridgeBiome = terrainToggle > 0.65; // ~25% Bridges (Rare Leaps)
-
-    // 🛡️ FAIL-SAFE GROUND SEAL (Prevents any sky-leaks)
+    // 🛤️ TRACK & GROUND (NEAR LAYER: 1.0 SPEED)
+    // Fail-safe ground seal (Backing layer)
     ctx.fillStyle = isNight ? '#050805' : '#0a120a';
     ctx.fillRect(0, CONFIG.trackY, canvas.width, canvas.height - CONFIG.trackY);
 
-    let staticBridgeX = (worldDistance < 100000) ? 50000 : 150000;
-    const bridgeRelativeX = staticBridgeX - worldDistance + (canvas.width / 2);
-
-    if(bridgeRelativeX > -8000 && bridgeRelativeX < canvas.width + 8000) drawMegaBridge(bridgeRelativeX - 4000, 8000, isSunset, isNight);
-    else if (isBridgeBiome) drawStandardArches(isGhatMode);
-    else drawEarthenBase(isSunset, isNight);
+    // 🌉 SPATIAL INFRASTRUCTURE (Seamless Ground & Dual-Bridge Transition 🔥)
+    drawMovingWater(isNight);            // 🌊 1. Water Pass (Always call - filters per zone)
+    drawConcreteBridgeLower(isSunset, isNight); // 🌉 2. Concrete Arches
+    drawEarthenBase(isSunset, isNight);  // 🧱 3. Ground Base
+    drawBridgeLower(isGhatMode);         // 🏗️ 4. Steel Girder Pass
+    drawBridgeTruss(false);              // 🕸️ 5. Hinter Truss Pass
 
     drawOHELines();
-    drawSignals4Aspect();
     drawMainTrack();
-    trees.filter(t => t.layer === 1).forEach(drawTree);
+
     stations.forEach(s => {
         let sx = s.x - worldDistance + (canvas.width / 2);
-        if(sx > -6000 && sx < canvas.width + 6000) drawStationProcedural(sx, s.name);
+        // Expand clipping boundary to 30,000 to support 15km platforms (Anti-Ghosting Fix)
+        if(sx > -30000 && sx < canvas.width + 30000) drawStationProcedural(sx, s.name);
     });
 
     if(oppTrain) drawOppositeTrain(oppTrain);
-    trees.filter(t => t.layer === 0).forEach(drawTree); 
+
+    // 🚆 TRAIN (ABOVE TRACK)
     drawRestoredTrain();
 
-    // 🌳 FOREGROUND GROUNDING: Lowered to clear train bogies (Adaptive Offset)
+    // 🌘 REALISM PASS (Front Truss & Mirror Reflection 🔥)
+    drawBridgeTruss(true);
+    drawReflectionAndShadow(isSunset, isNight);
+
+    // 🌳 FOREGROUND GROUNDING
     let foreOffset = (canvas.height < 500) ? 60 : 40; 
-    drawForegroundGrass(foreOffset);
+    if (!isBridgeBiome) {
+        drawForegroundGrass(foreOffset);
+    }
     
-    // Render Particles (Sparks & Smoke)
+    // Render Particles (Sparks, Smoke, Fire)
     particles.forEach(p => {
-        ctx.fillStyle = p.c;
         ctx.globalAlpha = p.a;
-        if(p.type === 'spark') {
-            ctx.beginPath(); ctx.arc(p.x, p.y, Math.random()*3 + 1, 0, Math.PI*2); ctx.fill();
-        } else if(p.type === 'fire') {
-            ctx.fillRect(p.x, p.y, 4, 4);
+        if(p.type === 'smoke') {
+            ctx.fillStyle = isNight ? 'rgba(50,50,50,0.5)' : 'rgba(200,200,200,0.5)';
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI*2); ctx.fill();
+        } else {
+            ctx.fillStyle = p.c;
+            if(p.type === 'spark') {
+                ctx.beginPath(); ctx.arc(p.x, p.y, Math.random()*3 + 1, 0, Math.PI*2); ctx.fill();
+            } else if(p.type === 'fire') {
+                ctx.fillRect(p.x, p.y, 4, 4);
+            }
         }
     });
     ctx.globalAlpha = 1.0;
 
-    if(rainAlpha > 0) {
+    // 🌧️ 12. LAYERED 3D RAIN (Final Plus)
+    if (rainAlpha > 0) {
         rainDrops.forEach(d => {
-            d.y += d.s; d.x -= speed; if(d.y > canvas.height) d.y = -20; if(d.x < 0) d.x = canvas.width;
+            // Foreground drops move faster and look thicker
+            let isForeground = d.layer === 'front';
+            ctx.lineWidth = isForeground ? sc(2) : sc(1);
+            ctx.strokeStyle = isForeground ? `rgba(200, 230, 255, ${rainAlpha})` : `rgba(150, 150, 200, ${rainAlpha * 0.5})`;
             
             // Illuminating rain in the headlight cone
             let isIlluminated = lampsOn && d.x > CONFIG.trainX + 500 && d.y > CONFIG.trackY - 200 && d.y < CONFIG.trackY + 300;
-            ctx.strokeStyle = isIlluminated ? `rgba(255, 255, 100, ${rainAlpha})` : `rgba(200, 220, 255, ${rainAlpha * 0.5})`;
-            ctx.lineWidth = isIlluminated ? 2 : 1;
+            if(isIlluminated) {
+                ctx.strokeStyle = `rgba(255, 255, 100, ${rainAlpha})`;
+                ctx.lineWidth = sc(3);
+            }
             
-            ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x-5, d.y+15); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - (speed/2), d.y + d.s); ctx.stroke();
         });
+    }
+
+    // 🌙 13. AMBIENT NIGHT OVERLAY (Final Plus)
+    const skyPhase = Math.sin((timeOfDay / 1000) * Math.PI * 2);
+    if (skyPhase < -0.1) {
+        ctx.fillStyle = `rgba(0, 0, 40, ${ Math.min(0.5, Math.abs(skyPhase) * 0.6) })`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
     // Foreground High-Speed Overlay (Softened for Realism)
@@ -610,6 +883,21 @@ function draw() {
         }
     }
 
+    // 🚦 SIGNALS (FINAL LAYER)
+    drawSignals4Aspect();
+
+    // 🌨️ 14. ATMOSPHERIC OVERLAYS (Final Pro)
+    if (weather === 'STORM') {
+        ctx.fillStyle = `rgba(0, 5, 10, ${rainAlpha * 0.4})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    // 💨 KINETIC MOTION BLUR
+    if (speed > 8) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.08, (speed - 8)*0.01)})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     ctx.restore();
 }
 
@@ -617,16 +905,20 @@ function drawSignals4Aspect() {
     signals.forEach(s => {
         let sx = s.x - worldDistance + (canvas.width / 2);
         if(sx > -100 && sx < canvas.width + 100) {
-            ctx.fillStyle = '#222'; ctx.fillRect(sx, CONFIG.trackY-sc(350), sc(12), sc(350)); 
-            ctx.fillStyle = '#111'; ctx.fillRect(sx-sc(15), CONFIG.trackY-sc(350), sc(42), sc(110));
+            let signalY = CONFIG.trackY; // 🎯 GROUNDED SIGNAL POSITION
             
-            // Adaptive Wire Height (PC: ~300. Mobile: ~200)
-            let wireY = (canvas.height < 500) ? CONFIG.trackY - sc(200) : CONFIG.trackY - sc(325);
+            ctx.fillStyle = '#222'; 
+            ctx.fillRect(sx, signalY - sc(350), sc(12), sc(350)); 
+            ctx.fillStyle = '#111'; 
+            ctx.fillRect(sx - sc(15), signalY - sc(350), sc(42), sc(110));
+            
+            // Adaptive Wire Height for aspect center
+            let aspectY = signalY - sc(320);
             
             const drawAspect = (yOff, color, active) => {
                 ctx.fillStyle = active ? color : '#333';
-                ctx.beginPath(); ctx.arc(sx+sc(6), wireY - sc(10) + sc(yOff), sc(10), 0, Math.PI*2); ctx.fill();
-                if(active) { ctx.shadowBlur = 15; ctx.shadowColor = color; ctx.stroke(); ctx.shadowBlur = 0; }
+                ctx.beginPath(); ctx.arc(sx+sc(6), aspectY + sc(yOff), sc(10), 0, Math.PI*2); ctx.fill();
+                if(active) { ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = color; ctx.stroke(); ctx.restore(); }
             };
             drawAspect(0, '#0f0', s.aspect === 'GREEN'); 
             drawAspect(25, '#ff0', s.aspect === 'DOUBLE_YELLOW' || s.aspect === 'YELLOW'); 
@@ -634,6 +926,61 @@ function drawSignals4Aspect() {
             drawAspect(75, '#f00', s.aspect === 'RED');
         }
     });
+}
+
+function drawDDUDisplay() {
+    if(!dctx) return;
+    dctx.fillStyle = '#051005';
+    dctx.fillRect(0, 0, dduCanvas.width, dduCanvas.height);
+    
+    // Scanline & Flicker Effect (V151.15)
+    dctx.fillStyle = 'rgba(0, 255, 0, 0.02)';
+    for(let i=0; i<dduCanvas.height; i+=4) dctx.fillRect(0, i, dduCanvas.width, 2);
+    if(Math.random() > 0.98) { dctx.fillStyle = 'rgba(0,255,0,0.05)'; dctx.fillRect(0,0,300,150); }
+
+    dctx.fillStyle = '#00ff44';
+    dctx.font = 'bold 16px Courier New';
+    dctx.fillText(">> LOCO DIAGNOSTICS - WAP7", 15, 25);
+    
+    dctx.font = '14px Courier New';
+    dctx.fillText(`SPEED: ${(speed*10).toFixed(1)} KM/H`, 15, 55);
+    
+    // Status Logic
+    if (isWaitingForStarter) {
+        dctx.fillStyle = '#ff9900';
+        // 🕒 Precise Starter Countdown
+        let timeLeft = Math.max(0, starterTimer).toFixed(1);
+        dctx.fillText(`STATUS: SIGNAL CLEARANCE (${timeLeft}s)`, 15, 80);
+    } else if (gameState === G_STATE.BOARDING) {
+        dctx.fillStyle = '#00ccff';
+        // 🕒 Precise 7s Countdown (Frame based)
+        let timeLeft = Math.max(0, (dwellTimer / 60)).toFixed(1);
+        dctx.fillText(`STATUS: BOARDING (${timeLeft}s)`, 15, 80);
+    } else if (brakeNotch === 5 && speed === 0 && throttleNotch === 0) {
+        dctx.fillStyle = '#ff3333';
+        dctx.fillText("STATUS: EMERGENCY - SIGNAL JUMP", 15, 80);
+    } else {
+        dctx.fillStyle = '#00ff44';
+        dctx.fillText(`NOTCH: ${throttleNotch > 0 ? "P" + throttleNotch : (brakeNotch > 0 ? "B" + brakeNotch : "N0")}`, 15, 80);
+    }
+    
+    let bp = (5.0 - (brakeNotch * 0.4)).toFixed(1);
+    dctx.fillStyle = '#00ff44';
+    dctx.fillText(`BP PRESSURE: ${bp} KG/CM2`, 15, 100);
+    
+    // Mission Status
+    let nextStation = stations.find(s => s.x > worldDistance);
+    if(nextStation) {
+        let d = ((nextStation.x - worldDistance) / 1000).toFixed(1);
+        dctx.fillStyle = '#ffcc00';
+        dctx.fillText(`NEXT: ${nextStation.name} (${d} KM)`, 15, 130);
+    }
+    
+    // Load Bar
+    dctx.fillStyle = '#111'; dctx.fillRect(260, 45, 20, 80);
+    dctx.fillStyle = (throttleNotch > 0) ? '#00ff00' : (brakeNotch > 0 ? '#ff3333' : '#444');
+    let h = (throttleNotch / 8) * 80 || (brakeNotch / 5) * 80;
+    dctx.fillRect(260, 125 - h, 20, h);
 }
 
 function drawSpeedometerUI() {
@@ -800,7 +1147,6 @@ function drawLHBProcedural(x, y) {
     const W = sc(400), H = sc(85); 
     drawBogie(x + sc(40), y + H - sc(12)); drawBogie(x + sc(260), y + H - sc(12));
     
-    // Rajdhani Red Scheme with Gradients
     let redGrd = ctx.createLinearGradient(0, y, 0, y + H/2);
     redGrd.addColorStop(0, '#e74c3c'); redGrd.addColorStop(1, '#922b21');
     ctx.fillStyle = redGrd; ctx.fillRect(x, y, W, H/2); 
@@ -809,33 +1155,32 @@ function drawLHBProcedural(x, y) {
     greyGrd.addColorStop(0, '#bdc3c7'); greyGrd.addColorStop(1, '#566573');
     ctx.fillStyle = greyGrd; ctx.fillRect(x, y + H/2, W, H/2); 
     
-    // Corrugated Roof Lines
     ctx.strokeStyle = '#b30000'; ctx.lineWidth = 1;
-    for(let r=0; r<W; r+=sc(8)) {
+    for(let r=0; r<W; r+=sc(12)) {
         ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + r, y + sc(6)); ctx.stroke();
     }
     
-    // Doors
-    ctx.fillStyle = '#a93226'; ctx.fillRect(x + sc(5), y + sc(8), sc(35), H - sc(16)); 
-    ctx.fillRect(x + W - sc(40), y + sc(8), sc(35), H - sc(16)); 
+    const doorW = sc(35), doorH = H - sc(16), dx = x + sc(5), dy = y + sc(8);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(dx, dy, doorW, doorH); 
+    ctx.fillRect(x + W - sc(40), dy, doorW, doorH); 
     
-    // Door yellow Grab-rails
+    ctx.fillStyle = '#a93226';
+    ctx.fillRect(dx + (doorOpenAmount * doorW), dy, doorW, doorH);
+    ctx.fillRect(x + W - sc(40) - (doorOpenAmount * doorW), dy, doorW, doorH);
+    
     ctx.fillStyle = '#f1c40f';
-    ctx.fillRect(x + sc(4), y + sc(16), sc(2), sc(45)); ctx.fillRect(x + sc(40), y + sc(16), sc(2), sc(45));
-    ctx.fillRect(x + W - sc(41), y + sc(16), sc(2), sc(45)); ctx.fillRect(x + W - sc(5), y + sc(16), sc(2), sc(45));
+    ctx.fillRect(dx-sc(1), y + sc(16), sc(2), sc(45)); 
+    ctx.fillRect(dx+doorW+sc(1), y + sc(16), sc(2), sc(45));
+    ctx.fillRect(x + W - sc(41), y + sc(16), sc(2), sc(45)); 
+    ctx.fillRect(x + W - sc(5), y + sc(16), sc(2), sc(45));
 
-    // Advanced Tinted Windows
-    for(let i=0; i<8; i++) {
-        let wx = x + 60 + i * 38;
-        // Outer Rubber Seal
-        ctx.fillStyle = '#111'; ctx.fillRect(wx, y + 12, 28, 38); 
-        // Gradient Blue Glass
-        let wGrd = ctx.createLinearGradient(wx, y+15, wx+22, y+47);
+    for(let i=0; i<7; i++) {
+        let wx = x + sc(60) + i * sc(42);
+        ctx.fillStyle = '#111'; ctx.fillRect(wx, y + sc(12), sc(30), sc(38)); 
+        let wGrd = ctx.createLinearGradient(wx, y+sc(15), wx+sc(22), y+sc(47));
         wGrd.addColorStop(0, 'rgba(41, 128, 185, 0.9)'); wGrd.addColorStop(1, 'rgba(21, 67, 96, 0.95)');
-        ctx.fillStyle = wGrd; ctx.fillRect(wx + 3, y + 15, 22, 32); 
-        // Diagonal glass glare
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; 
-        ctx.beginPath(); ctx.moveTo(wx+3, y+15); ctx.lineTo(wx+25, y+15); ctx.lineTo(wx+3, y+47); ctx.fill();
+        ctx.fillStyle = wGrd; ctx.fillRect(wx + sc(3), y + sc(15), sc(24), sc(32)); 
     }
 
     // Typography
@@ -872,8 +1217,12 @@ function drawWheel(x, y) {
     ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(0, 0, sc(6), 0, Math.PI*2); ctx.fill(); 
     ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(0, 0, sc(3), 0, Math.PI*2); ctx.fill(); 
     
-    // Spoke/Movement indicators
-    ctx.fillStyle = '#bdc3c7'; ctx.fillRect(-sc(2), -sc(15), sc(4), sc(30)); ctx.fillRect(-sc(15), -sc(2), sc(30), sc(4));
+    // Spoke/Movement indicators (Added more for better rotation visual)
+    ctx.fillStyle = '#bdc3c7'; 
+    for(let i=0; i<4; i++) {
+        ctx.rotate(Math.PI/4);
+        ctx.fillRect(-sc(2), -sc(16), sc(4), sc(32)); 
+    }
     ctx.restore(); 
     
     // Static Brake Pads (do not rotate)
@@ -899,93 +1248,169 @@ function drawTree(t) {
 }
 
 function drawStationProcedural(x, name) {
-    const pW = sc(7500); 
-    // 🏟️ 1. THE CONCRETE SLAB (3D Station Base)
-    let slabGrd = ctx.createLinearGradient(0, CONFIG.trackY-sc(10), 0, CONFIG.trackY+sc(20));
-    slabGrd.addColorStop(0, '#7f8c8d'); // Concrete Top
-    slabGrd.addColorStop(1, '#2c3e50'); // Dark vertical face
-    ctx.fillStyle = slabGrd;
-    ctx.fillRect(x - pW/2, CONFIG.trackY - sc(10), pW, sc(110));
+    const pW = sc(15000); // 🚉 MEGA PLATFORM UPGRADE (Grand Scale)
+    const platformY = CONFIG.trackY - sc(10); 
+    
+    // 🧱 1. THE PLATFORM SLAB (3D Depth)
+    // Top Surface
+    ctx.fillStyle = '#95a5a6'; 
+    ctx.fillRect(x - pW/2, platformY, pW, sc(15));
+    
+    // Front Wall (Vertical Face)
+    let wallGrd = ctx.createLinearGradient(0, platformY + sc(15), 0, platformY + sc(110));
+    wallGrd.addColorStop(0, '#7f8c8d');
+    wallGrd.addColorStop(1, '#2c3e50');
+    ctx.fillStyle = wallGrd;
+    ctx.fillRect(x - pW/2, platformY + sc(15), pW, sc(95));
 
-    // 🟡 Safety Yellow Line
+    // 🟡 Safety Yellow Line (Grounded)
     ctx.fillStyle = '#f1c40f';
-    ctx.fillRect(x - pW/2, CONFIG.trackY - sc(8), pW, sc(6));
+    ctx.fillRect(x - pW/2, platformY + sc(2), pW, sc(5));
 
-    // 🏠 2. BETTER 3D PLATFORM ROOF
-    let roofGrd = ctx.createLinearGradient(0, CONFIG.trackY-sc(450), 0, CONFIG.trackY-sc(300));
+    // 🏠 2. THE ROOF (Aligned to Pillars)
+    const roofY = CONFIG.trackY - sc(450);
+    const roofHeight = sc(150);
+    const pillarTopY = roofY + roofHeight;
+
+    let roofGrd = ctx.createLinearGradient(0, roofY, 0, pillarTopY);
     roofGrd.addColorStop(0, '#5a1f1f');
     roofGrd.addColorStop(1, '#8b2e2e');
     ctx.fillStyle = roofGrd;
-    ctx.fillRect(x - pW/2, CONFIG.trackY-sc(450), pW, sc(150));
-    ctx.fillStyle = '#3a1313'; // Roof edge
-    ctx.fillRect(x - pW/2, CONFIG.trackY-sc(300), pW, sc(10));
+    ctx.fillRect(x - pW/2, roofY, pW, roofHeight);
     
+    // Roof Structural Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(x - pW/2, pillarTopY - sc(5), pW, sc(10));
+    
+    // Corrugated Metal Ribbing
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1;
+    for(let r=0; r<roofHeight; r+=sc(12)) {
+        ctx.beginPath(); ctx.moveTo(x - pW/2, roofY + r); ctx.lineTo(x + pW/2, roofY + r); ctx.stroke();
+    }
+    
+    // 📐 3. SLOPED ENDINGS (The 'End Cap' Logic)
+    const drawEndSlope = (side) => {
+        let ex = (side === 'left') ? x - pW/2 : x + pW/2;
+        ctx.beginPath();
+        ctx.moveTo(ex, platformY);
+        ctx.lineTo(ex + (side === 'left' ? -sc(150) : sc(150)), platformY + sc(110));
+        ctx.lineTo(ex, platformY + sc(110));
+        ctx.closePath();
+        ctx.fillStyle = '#2c3e50';
+        ctx.fill();
+    };
+    drawEndSlope('left');
+    drawEndSlope('right');
+
     const hindiNames = { "KOLLAM JCT": "कोल्लम जंक्शन", "PARAVUR": "परवूर", "VARKALA SIVAGIRI": "वरकला शिवगिरि", "KADAKKAVUR": "कडक्कावूर", "CHIRAYINKEEZHU": "चिरायिनकीझु", "TRIVANDRUM CENTRAL": "तिरुवनंतपुरम सेंट्रल" };
     const hindiName = hindiNames[name] || "";
 
-    for(let k=0; k<20; k++) {
-        let sx = x - pW/2.5 + (k * sc(400));
+    for(let k=0; k<45; k++) {
+        let sx = x - pW/2.1 + (k * sc(400));
         
-        // Steel Pillars
+        // 🏛️ 4. PILLARS (Perfectly Grounded: Roof -> Platform)
         ctx.fillStyle = '#7f8c8d'; 
-        ctx.fillRect(sx, CONFIG.trackY-sc(300), sc(15), sc(272)); 
+        ctx.fillRect(sx, pillarTopY, sc(15), platformY - pillarTopY); 
+        ctx.fillStyle = '#444'; // Depth Shadow
+        ctx.fillRect(sx + sc(12), pillarTopY, sc(3), platformY - pillarTopY); 
         
-        // Digital LED indicators hanging from roof
+        // Digital LED indicators
         if (k % 2 === 0) {
-            ctx.fillStyle = '#111'; ctx.fillRect(sx - sc(40), CONFIG.trackY-sc(280), sc(100), sc(30));
-            ctx.fillStyle = '#ff3333'; ctx.font = `bold ${sc(12)}px monospace`; ctx.fillText('ETA 05 MIN', sx + sc(10), CONFIG.trackY-sc(260));
+            ctx.fillStyle = '#111'; ctx.fillRect(sx - sc(40), pillarTopY + sc(20), sc(100), sc(30));
+            ctx.fillStyle = '#ff3333'; ctx.font = `bold ${sc(12)}px monospace`; ctx.fillText('ETA 05 MIN', sx + sc(10), pillarTopY + sc(40));
         }
         
         // Authentic Station Display Board
         if (k % 5 === 1) {
-            ctx.fillStyle = '#111'; ctx.fillRect(sx + sc(10), CONFIG.trackY-sc(200), sc(10), sc(100)); // Posts
-            ctx.fillRect(sx + sc(180), CONFIG.trackY-sc(200), sc(10), sc(100));
+            ctx.fillStyle = '#111'; ctx.fillRect(sx + sc(10), platformY - sc(180), sc(6), sc(180)); // Grounded Posts
+            ctx.fillRect(sx + sc(180), platformY - sc(180), sc(6), sc(180));
             
-            ctx.fillStyle = '#ffcc00'; ctx.fillRect(sx, CONFIG.trackY-sc(200), sc(200), sc(80)); // Classic yellow board
-            ctx.strokeStyle = '#000'; ctx.lineWidth = sc(4); ctx.strokeRect(sx, CONFIG.trackY-sc(200), sc(200), sc(80));
+            ctx.fillStyle = '#ffcc00'; ctx.fillRect(sx, platformY - sc(180), sc(200), sc(80)); 
+            ctx.strokeStyle = '#000'; ctx.lineWidth = sc(4); ctx.strokeRect(sx, platformY - sc(180), sc(200), sc(80));
             
             ctx.fillStyle = '#000'; 
             ctx.textAlign = 'center';
-            ctx.font = `bold ${sc(20)}px Arial`; ctx.fillText(name, sx + sc(100), CONFIG.trackY-sc(150)); // English
-            ctx.font = `bold ${sc(14)}px Arial`; ctx.fillText(hindiName, sx + sc(100), CONFIG.trackY-sc(175)); // Hindi
+            ctx.font = `bold ${sc(20)}px Arial`; ctx.fillText(name, sx + sc(100), platformY - sc(130)); 
+            ctx.font = `bold ${sc(14)}px Arial`; ctx.fillText(hindiName, sx + sc(100), platformY - sc(155)); 
         }
         
-        // Benches and Stalls
+        // Benches and Stalls (Grounded to Platform)
         if (k % 3 === 0) {
-            // Purple Bench
-            ctx.fillStyle = '#8e44ad'; ctx.fillRect(sx + 50, CONFIG.trackY-60, 60, 30);
-            ctx.fillStyle = '#6c3483'; ctx.fillRect(sx + 50, CONFIG.trackY-60, 60, 8);
-            // Person on bench
-            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(sx + 80, CONFIG.trackY-75, 10, 0, Math.PI*2); ctx.fill();
-            ctx.fillRect(sx + 75, CONFIG.trackY-65, 10, 20);
-        } else if (k % 7 === 0) {
-            // Small Book Stall (A.H Wheeler style)
-            ctx.fillStyle = '#d35400'; ctx.fillRect(sx + 50, CONFIG.trackY-100, 120, 72);
-            ctx.fillStyle = '#2c3e50'; ctx.fillRect(sx + 45, CONFIG.trackY-100, 130, 20); // Awning
-            ctx.fillStyle = '#ecf0f1'; ctx.font = 'bold 12px Arial'; ctx.fillText('A.H WHEELER', sx + 110, CONFIG.trackY-85);
-            ctx.fillStyle = '#f1c40f'; ctx.fillRect(sx + 60, CONFIG.trackY-60, 100, 30); // Counter
+            ctx.fillStyle = '#8e44ad'; ctx.fillRect(sx + 50, platformY - sc(30), sc(60), sc(30));
+            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(sx + 80, platformY - sc(45), sc(10), 0, Math.PI*2); ctx.fill(); // Person
         }
     }
     
-    // Dynamic Crowd (Groundedsilhouettes)
-    for(let j=0; j<80; j++) { 
-        let walkOffset = Math.sin((Date.now()/500) + j) * 20; 
-        let px = x - pW/2.2 + (j*130) + walkOffset; 
-        let py = CONFIG.trackY - sc(10); // Floor contact
-        ctx.fillStyle = '#1a1a1a';
-        ctx.beginPath(); ctx.arc(px, py - 45, 10, 0, Math.PI*2); ctx.fill(); 
-        ctx.fillRect(px-5, py - 35, 10, 35);
-        // Legs (animated swinging)
-        let legSwing = Math.sin(Date.now()/200 + j)*6;
-        ctx.fillRect(px-4 + legSwing, CONFIG.trackY-39, 4, 15);
-        ctx.fillRect(px+2 - legSwing, CONFIG.trackY-39, 4, 15);
+    // 🎭 5. LIFE & ACTIVITY (Vibrant Indian Crowd System 🔥)
+    const seed = name.length; 
+    const crowdColors = ['#e67e22', '#c0392b', '#16a085', '#2980b9', '#f1c40f', '#ecf0f1', '#34495e', '#ffffff'];
+    
+    for(let j=0; j<70; j++) { 
+        // 🏗️ 5A. GROUP CLUSTERING LOGIC (Ending the Loneliness)
+        // Deterministic clustering based on station seed
+        let clusterSeed = Math.sin(seed + j * 12.3);
+        let pxBase = x - pW/2.2 + (j * sc(220)); 
+        if (pxBase < x - pW/2 || pxBase > x + pW/2) continue;
+
+        let groupSize = Math.floor(1 + Math.abs(clusterSeed * 4));
+        for(let g=0; g<groupSize; g++) {
+            let memberSeed = Math.sin(j + g * 3.3);
+            let px = pxBase + (g * sc(22)) + (memberSeed * sc(10));
+            let py = platformY;
+            
+            // Human Body (Vibrant clothing colors)
+            let clothesColor = crowdColors[Math.abs(Math.floor(memberSeed * 10)) % crowdColors.length];
+            ctx.fillStyle = clothesColor;
+            let pHeight = sc(38) + (memberSeed * sc(5));
+            ctx.beginPath();
+            ctx.moveTo(px - sc(8), py); ctx.lineTo(px + sc(8), py);
+            ctx.lineTo(px + sc(6), py - pHeight); ctx.lineTo(px - sc(6), py - pHeight);
+            ctx.fill();
+
+            // Head
+            ctx.fillStyle = '#111';
+            ctx.beginPath(); ctx.arc(px, py - pHeight - sc(6), sc(7), 0, Math.PI*2); ctx.fill();
+
+            // 💼 LUGGAGE Props (Suitcases & Backpacks)
+            if (g === 0 && clusterSeed > 0.2) {
+                ctx.fillStyle = '#2c3e50'; 
+                ctx.fillRect(px + sc(15), py - sc(15), sc(22), sc(15));
+                if (clusterSeed > 0.6) {
+                    ctx.fillStyle = '#7f8c8d'; ctx.fillRect(px + sc(18), py - sc(35), sc(15), sc(20));
+                }
+            }
+        }
+    }
+
+    // 🛋️ 6. SITTING PASSENGERS (Grounded to Benches)
+    for(let k=0; k<20; k++) {
+        if (k % 3 === 0) {
+            let sx = x - pW/2.5 + (k * sc(400)) + 80;
+            
+            // Purple Bench
+            ctx.fillStyle = '#8e44ad'; 
+            ctx.fillRect(sx - 30, platformY - sc(30), sc(60), sc(30));
+            ctx.fillStyle = '#6c3483'; 
+            ctx.fillRect(sx - 25, platformY - sc(30), sc(50), sc(5)); // Cushion
+
+            // Sitting Person (Specifically posed)
+            ctx.fillStyle = '#0a0a0a';
+            ctx.beginPath(); 
+            ctx.arc(sx, platformY - sc(42), sc(8), 0, Math.PI*2); // Head
+            ctx.fill();
+            ctx.fillRect(sx - sc(6), platformY - sc(34), sc(12), sc(20)); // Torso
+            
+            // Sitting knees
+            ctx.fillRect(sx, platformY - sc(20), sc(15), sc(4)); 
+            ctx.fillRect(sx + sc(12), platformY - sc(20), sc(4), sc(15)); // Legs down
+        }
     }
 }
 
 function drawOHELines() { 
     let poleOffset = bgX % sc(450); 
     let wireY = (canvas.height < 500) ? CONFIG.trackY - sc(200) : CONFIG.trackY - sc(325);
-    ctx.lineWidth = sc(3); ctx.strokeStyle = '#4488ff'; ctx.beginPath(); ctx.moveTo(0, wireY); ctx.lineTo(canvas.width, wireY); ctx.stroke();
+    ctx.lineWidth = sc(2); ctx.strokeStyle = '#333'; ctx.beginPath(); ctx.moveTo(0, wireY); ctx.lineTo(canvas.width, wireY); ctx.stroke();
     for(let i=-sc(450); i<canvas.width+sc(450); i+=sc(450)) { let px = i-poleOffset; ctx.fillStyle = '#222'; ctx.fillRect(px, CONFIG.trackY-sc(370), sc(15), sc(370)); } 
 }
 
@@ -1092,64 +1517,179 @@ function drawMegaBridge(x, width, isSunset, isNight) {
     }
     ctx.restore();
 }
-function drawStandardArches(isHigh = false) {
+function drawBridgeLower(isHigh = false) {
     const archWidth = 800;
     const startX = - (worldDistance % archWidth) - archWidth;
-    const archDepth = isHigh ? 450 : 220; // ⛰️ High-Ghat Leap Physics
     
-    // 🧬 PULSE & INDIGO SHADOW SYNC
-    let pulse = Math.sin(Date.now() / 1500) * 0.1 + 0.9;
-
-    for (let x = startX; x < canvas.width + archWidth; x += archWidth) {
-        // 🪨 Reinforced Pillar Structure
-        let pillarGrd = ctx.createLinearGradient(x, CONFIG.trackY, x + 150, CONFIG.trackY);
-        pillarGrd.addColorStop(0, '#1a1d1a'); pillarGrd.addColorStop(1, '#0a0d0a');
-        ctx.fillStyle = pillarGrd; ctx.fillRect(x, CONFIG.trackY + 1, 150, canvas.height);
+    for (let i = 0; i < 10; i++) {
+        let x = startX + (i * archWidth);
+        let worldX = worldDistance + (x - (canvas.width / 2)) + (archWidth / 2);
+        let sType = getStructuralType(worldX);
         
-        if(isHigh) { // Extra architectural tier for high-altitude mountains
-            ctx.fillStyle = '#080a08'; ctx.fillRect(x - 20, CONFIG.trackY + 1, 190, 40);
+        // 🧪 STEEL-ONLY GUARD
+        if (sType.main !== 'bridge' || sType.sub !== 'STEEL') continue;
+
+        let girderH = sc(50);
+        ctx.fillStyle = '#2b2b2b';
+        ctx.fillRect(x, CONFIG.trackY + sc(20), archWidth - sc(20), girderH);
+
+        // Diagonal Supports (Steel Lattice)
+        ctx.strokeStyle = '#444'; ctx.lineWidth = sc(3); ctx.beginPath();
+        for(let j=0; j<8; j++) {
+            let segX = x + (j * (archWidth/8));
+            ctx.moveTo(segX, CONFIG.trackY + sc(20)); ctx.lineTo(segX + (archWidth/8), CONFIG.trackY + sc(20) + girderH);
+            ctx.moveTo(segX + (archWidth/8), CONFIG.trackY + sc(20)); ctx.lineTo(segX, CONFIG.trackY + sc(20) + girderH);
         }
+        ctx.stroke();
 
-        // 🌑 3D ARCH DEPTH (The 'Real-Life' shadow logic)
-        ctx.beginPath(); 
-        ctx.moveTo(x + 150, CONFIG.trackY + 1); 
-        ctx.quadraticCurveTo(x + 400, CONFIG.trackY + archDepth, x + 650, CONFIG.trackY + 1); 
-        
-        let archGrd = ctx.createRadialGradient(x + 400, CONFIG.trackY + 80, 50, x + 400, CONFIG.trackY + 80, 250);
-        archGrd.addColorStop(0, `rgba(10, 15, 45, ${0.45 * pulse})`); 
-        archGrd.addColorStop(1, 'rgba(0,0,0,0)'); 
-        ctx.fillStyle = archGrd; ctx.fill(); 
-        
-        ctx.strokeStyle = '#2c352c'; ctx.lineWidth = 4; ctx.stroke();
+        ctx.fillStyle = '#111';
+        ctx.fillRect(x + (archWidth/2) - sc(30), CONFIG.trackY + sc(70), sc(60), canvas.height);
+        ctx.fillStyle = '#050a05';
+        ctx.fillRect(x + (archWidth/2) - sc(45), CONFIG.trackY + sc(250), sc(90), sc(30));
     }
 }
-function drawEarthenBase(isSunset, isNight) {
-    // 🪨 Solid Earthen Embankment (3D Trapezoid)
-    ctx.fillStyle = isNight ? '#0a0d0a' : '#1a1d1a';
+
+function drawBridgeTruss(isForeground) {
+    const archWidth = 800;
+    const startX = - (worldDistance % archWidth) - archWidth;
+    const trussHeight = sc(300);
     
-    // 🏟️ 1. THE BALLAST TOP (No-Gap Physics)
+    ctx.save();
+    ctx.strokeStyle = isForeground ? '#1a1a1a' : '#2b2b2b';
+    ctx.lineWidth = isForeground ? sc(12) : sc(8);
+    
+    for (let i = 0; i < 10; i++) {
+        let x = startX + (i * archWidth);
+        let worldX = worldDistance + (x - (canvas.width / 2)) + (archWidth / 2);
+        let sType = getStructuralType(worldX);
+        
+        // 🧪 STEEL-ONLY GUARD
+        if (sType.main !== 'bridge' || sType.sub !== 'STEEL') continue;
+
+        let tx = x + sc(10);
+        let tw = archWidth - sc(40);
+
+        ctx.beginPath();
+        ctx.moveTo(tx, CONFIG.trackY); ctx.lineTo(tx, CONFIG.trackY - trussHeight);
+        ctx.moveTo(tx + tw, CONFIG.trackY); ctx.lineTo(tx + tw, CONFIG.trackY - trussHeight);
+        ctx.moveTo(tx, CONFIG.trackY - trussHeight); ctx.lineTo(tx + tw, CONFIG.trackY - trussHeight);
+        ctx.stroke();
+
+        ctx.lineWidth = isForeground ? sc(8) : sc(5);
+        ctx.beginPath();
+        let segments = 3; let segW = tw / segments;
+        for(let j=0; j<segments; j++) {
+            let sx = tx + (j * segW);
+            ctx.moveTo(sx, CONFIG.trackY); ctx.lineTo(sx + segW, CONFIG.trackY - trussHeight);
+            ctx.moveTo(sx + segW, CONFIG.trackY); ctx.lineTo(sx, CONFIG.trackY - trussHeight);
+        }
+        ctx.stroke();
+        
+        if(isForeground) {
+            ctx.fillStyle = 'rgba(20, 20, 25, 0.8)';
+            ctx.fillRect(tx, CONFIG.trackY - trussHeight - sc(10), tw, sc(15));
+        }
+    }
+    ctx.restore();
+}
+
+function drawEarthenBase(isSunset, isNight) {
+    // 🏗️ SPATIAL GROUND (Only draws where NO bridge exists)
+    ctx.fillStyle = isNight ? '#0a0d0a' : '#1a1d1a';
     ctx.fillRect(0, CONFIG.trackY + sc(2), canvas.width, 48); 
     
-    // 📐 2. SLOPED EMBANKMENT (Direct Connection)
-    ctx.beginPath();
-    let grd = ctx.createLinearGradient(0, CONFIG.trackY + 40, 0, canvas.height);
-    grd.addColorStop(0, '#101510');
-    grd.addColorStop(1, '#050a05');
-    ctx.fillStyle = grd;
+    // Draw base only in segments categorized as 'ground'
+    for(let i=0; i<canvas.width; i+=400) {
+        let worldX = worldDistance + (i - (canvas.width / 2));
+        if (getStructuralType(worldX).main === 'bridge') continue;
+
+        ctx.beginPath();
+        let grd = ctx.createLinearGradient(0, CONFIG.trackY + 40, 0, canvas.height);
+        grd.addColorStop(0, '#101510'); grd.addColorStop(1, '#050a05');
+        ctx.fillStyle = grd;
+        ctx.fillRect(i, CONFIG.trackY + 40, 401, canvas.height);
+    }
+}
+
+// 🌉 ULTRA REAL CONCRETE BRIDGE (Proposed Indian Style 🔥)
+function drawConcreteBridgeLower(isSunset, isNight) {
+    const archWidth = 600;
+    const startX = - (worldDistance % archWidth) - archWidth;
+    const waterY = CONFIG.trackY + sc(120);
+
+    for (let i = 0; i < 12; i++) {
+        let x = startX + (i * archWidth);
+        let worldX = worldDistance + (x - (canvas.width / 2)) + (archWidth / 2);
+        let sType = getStructuralType(worldX);
+        if (sType.main !== 'bridge' || sType.sub !== 'WATER') continue;
+
+        // 1. CONCRETE PILLARS
+        ctx.fillStyle = isNight ? '#2c3e50' : '#bdc3c7';
+        ctx.fillRect(x + sc(100), CONFIG.trackY + sc(20), sc(100), waterY - CONFIG.trackY);
+        
+        // Depth Shadow on pillar sides
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(x + sc(100), CONFIG.trackY + sc(20), sc(15), waterY - CONFIG.trackY);
+
+        // 2. INDIAN ARCH CUTS (Visual Depth Engine)
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.arc(x + archWidth/2, waterY, sc(180), Math.PI, 0);
+        ctx.fill();
+        ctx.restore();
+        
+        // 3. SAFETY LINES (Indian Railway Detail)
+        ctx.fillStyle = '#f1c40f'; 
+        ctx.fillRect(0, CONFIG.trackY + sc(18), canvas.width, sc(4));
+    }
+}
+
+function drawMovingWater(isNight) {
+    waterOffset += 0.8;
+    const waterY = CONFIG.trackY + sc(120);
     
-    // Trapezoid shape - Moved higher to meet the ballast floor
-    ctx.moveTo(0, CONFIG.trackY + 40);
-    ctx.lineTo(canvas.width, CONFIG.trackY + 40);
-    ctx.lineTo(canvas.width, canvas.height);
-    ctx.lineTo(0, canvas.height);
+    // 🌊 1. DEEP WATER GRADIENT
+    let grd = ctx.createLinearGradient(0, waterY, 0, canvas.height);
+    grd.addColorStop(0, '#1e3f66');
+    grd.addColorStop(0.4, '#001a33');
+    grd.addColorStop(1, '#000');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, waterY, canvas.width, canvas.height - waterY);
+
+    // 〰️ 2. PROCEDURAL WAVE SYSTEM
+    ctx.strokeStyle = isNight ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 2;
+    for (let x = 0; x < canvas.width; x += sc(60)) {
+        let waveY = waterY + Math.sin((x + (waterOffset * (1.5))) * 0.04) * sc(8);
+        ctx.beginPath();
+        ctx.moveTo(x, waveY);
+        ctx.lineTo(x + sc(30), waveY);
+        ctx.stroke();
+    }
+}
+
+// 🌘 REALISM PASS: REFLECTIONS & SHADOWS
+function drawReflectionAndShadow(isSunset, isNight) {
+    const waterY = CONFIG.trackY + sc(120);
+    const sType = getStructuralType(worldDistance + 400);
+    if(sType.sub !== 'WATER') return;
+
+    // 1. TRAIN SHADOW (Ambient Occlusion)
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(CONFIG.trainX + sc(400), CONFIG.trackY + sc(75), sc(600), sc(25), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 🌿 Procedural Grass/Moss Decals
-    ctx.fillStyle = isSunset ? '#2e3a1f' : '#1a2a1a';
-    for(let i=0; i<canvas.width; i+=400) {
-        let rx = (i - (worldDistance % 400));
-        ctx.beginPath(); ctx.ellipse(rx, CONFIG.trackY + 50, 150, 40, 0, 0, Math.PI*2); ctx.fill();
-    }
+    // 2. INSANE REALISM REFLECTION
+    ctx.save();
+    ctx.globalAlpha = isNight ? 0.08 : 0.18;
+    ctx.translate(0, waterY * 2);
+    ctx.scale(1, -1); // Physics flip!
+    
+    // We only reflect the WAP-7 body for performance
+    drawWAP7Procedural(CONFIG.trainX, CONFIG.trackY);
+    ctx.restore();
 }
 
 window.onload = init;
