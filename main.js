@@ -270,6 +270,10 @@ function resize() {
     canvas.height = isMobileLandscape ? vh : vh * 0.7; 
     
     CONFIG.vScale = isMobileLandscape ? 0.60 : 0.88; 
+    
+    // 🚆 DYNAMIC TRAIN FRAMING: Pull head into view on small screens
+    CONFIG.trainX = isMobileLandscape ? (canvas.width * 0.25) : 450;
+    
     // Higher track position for full-screen immersive view
     CONFIG.trackY = isMobileLandscape ? canvas.height * 0.78 : canvas.height * 0.85;
 }
