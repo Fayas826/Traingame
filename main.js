@@ -363,10 +363,13 @@ function update() {
         }
     }
 
-    if (gameState === G_STATE.READY) {
-        doorOpenAmount = Math.max(doorOpenAmount - 0.02, 0);
-        if (doorOpenAmount <= 0) { gameState = G_STATE.DEPARTING; currentStationIdx = -1; }
-    }
+        if (doorOpenAmount <= 0) { 
+            gameState = G_STATE.DEPARTING; 
+            currentStationIdx = -1; 
+            // 🚦 RESET STARTER LOGIC FOR EVERY STATION (UNIVERSAL FIX)
+            isWaitingForStarter = true;
+            starterTimer = 7.0;
+        }
 
     // 🚦 STARTER SIGNAL LOGIC (Hard Sync & 7s Timer Fix 🔥)
     if(audioStarted && isWaitingForStarter) {
