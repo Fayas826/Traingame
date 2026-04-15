@@ -10,6 +10,7 @@
 <body>
     <div class="game-wrapper">
         <div id="alp-hud">
+            <button class="fullscreen-btn" onclick="window.toggleFullscreen()" title="Fullscreen">⛶</button>
             <div id="alp-container">
                 <img id="alp-avatar" src="assets/alp.png" alt="ALP">
                 <div>
@@ -61,9 +62,12 @@
 
     <div id="start-overlay">
         <div class="start-box">
+            <div style="font-size: 3rem; margin-bottom: 10px;">🇮🇳</div>
             <h1>INDIAN RAILWAYS</h1>
             <p>Realistic Simulator Pro</p>
-            <button onclick="startMobileAudio()">TAP TO START SYSTEMS</button>
+            <div style="color: #00ff88; font-size: 0.7rem; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px;">Mobile Elite Build V151.25</div>
+            <button onclick="startMobileAudio()">ACTIVATE SYSTEMS</button>
+            <p style="font-size: 0.6rem; color: #888; margin-top: 15px;">Landscape Mode & Fullscreen Recommended</p>
         </div>
     </div>
 

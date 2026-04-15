@@ -186,6 +186,20 @@ function init() {
     window.horn = () => { if(hornAudio) { hornAudio.currentTime = 0; hornAudio.play(); } };
     window.toggleLights = () => { lampsOn = !lampsOn; document.getElementById('light-btn').classList.toggle('active', lampsOn); };
     window.emergencyBrake = () => { brakeNotch = 5; throttleNotch = 0; updateDashboard(); speakALP("Emergency Brake Applied!"); };
+    
+    // ⚔️ IMMERSIVE ENGINE (Fullscreen API)
+    window.toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                // If standard fails, try webkit (Safari/iOS support)
+                if (document.documentElement.webkitRequestFullscreen) {
+                    document.documentElement.webkitRequestFullscreen();
+                }
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
 
     // 📱 HYBRID TOUCH CONTROLS (Updated for Notches)
     const handleTouch = (clientX) => {
@@ -209,11 +223,17 @@ function init() {
 }
 
 function resize() {
+    // 📱 NANO-RESIZE ENGINE (V151.25)
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight * 0.7;
+    
+    // Use Visual Viewport if available (More accurate for mobile scroll bars)
+    let vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    canvas.height = vh * 0.7; 
+    
     const isMobileLocal = canvas.height < 500;
+    // Scale HUD and tracks more aggressively in landscape to preserve view
     CONFIG.vScale = isMobileLocal ? 0.60 : 0.88; 
-    CONFIG.trackY = isMobileLocal ? canvas.height * 0.70 : canvas.height * 0.85;
+    CONFIG.trackY = isMobileLocal ? canvas.height * 0.75 : canvas.height * 0.85;
 }
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
