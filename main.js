@@ -150,37 +150,74 @@ function init() {
 
     window.startMobileAudio = () => {
         audioStarted = true;
+        document.body.classList.add('systems-active'); // ⚡ HUD POWER UP
         document.getElementById('start-overlay').style.display = 'none';
-        // locoAudio.play() removed here to ensure silence during wait
         speakALP("Waiting for signal");
         if (navigator.vibrate) navigator.vibrate(50);
     };
 
-    // ⚙️ NOTCH CONTROL SYSTEM (Pro Logic Refined)
     window.notchUp = () => {
         if(isWaitingForStarter || gameState === G_STATE.BOARDING) return;
         
-        // ⚡ QUICK RELEASE (Pro Logic): If in Emergency (B5), one click takes us to Neutral (N0)
+        let changed = false;
         if (brakeNotch === 5 && speed === 0) {
-            brakeNotch = 0;
+            brakeNotch = 0; changed = true;
         } else if (brakeNotch > 0) {
-            brakeNotch--;
+            brakeNotch--; changed = true;
         } else if (throttleNotch < 8) {
-            throttleNotch++;
+            throttleNotch++; changed = true;
         }
-        updateDashboard();
-        if (navigator.vibrate) navigator.vibrate(30);
+        
+        if(changed) {
+            updateDashboard();
+            pulseHUD(); // ⚡ Success Pulse
+            if (navigator.vibrate) navigator.vibrate(30);
+        }
     };
 
     window.notchDown = () => {
-        // Notch - first reduces power, then applies brakes
+        let changed = false;
         if (throttleNotch > 0) {
-            throttleNotch--;
+            throttleNotch--; changed = true;
         } else if (brakeNotch < 5) {
-            brakeNotch++;
+            brakeNotch++; changed = true;
         }
-        updateDashboard();
-        if (navigator.vibrate) navigator.vibrate(20);
+        
+        if(changed) {
+            updateDashboard();
+            pulseHUD(); // ⚡ Success Pulse
+            if (navigator.vibrate) navigator.vibrate(20);
+        }
+    };
+
+    // ⚡ PRO-TACTILE FEEDBACK ENGINE
+    function pulseHUD() {
+        const hud = document.querySelector('.mobile-hud');
+        if(hud) {
+            hud.classList.remove('hud-pulse');
+            void hud.offsetWidth; // Trigger reflow
+            hud.classList.add('hud-pulse');
+        }
+    }
+
+    window.createRipple = (e) => {
+        const zone = e.currentTarget;
+        const ripple = document.createElement('span');
+        ripple.classList.add('ripple');
+        
+        const rect = zone.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        ripple.style.width = ripple.style.height = `${size}px`;
+        
+        // Center ripple on touch coordinate
+        const x = (e.clientX || e.touches[0].clientX) - rect.left - size/2;
+        const y = (e.clientY || e.touches[0].clientY) - rect.top - size/2;
+        
+        ripple.style.left = `${x}px`;
+        ripple.style.top = `${y}px`;
+        
+        zone.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
     };
 
     window.horn = () => { if(hornAudio) { hornAudio.currentTime = 0; hornAudio.play(); } };
@@ -223,17 +260,18 @@ function init() {
 }
 
 function resize() {
-    // 📱 NANO-RESIZE ENGINE (V151.25)
+    // 📱 PRO MOBILE RESIZE ENGINE (V151.30)
     canvas.width = window.innerWidth;
     
-    // Use Visual Viewport if available (More accurate for mobile scroll bars)
     let vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    canvas.height = vh * 0.7; 
+    const isMobileLandscape = vh < 500 && window.innerWidth > vh;
     
-    const isMobileLocal = canvas.height < 500;
-    // Scale HUD and tracks more aggressively in landscape to preserve view
-    CONFIG.vScale = isMobileLocal ? 0.60 : 0.88; 
-    CONFIG.trackY = isMobileLocal ? canvas.height * 0.75 : canvas.height * 0.85;
+    // 🖥️ Laptop View: 70% Height | 📱 Pro Mobile: 100% Height
+    canvas.height = isMobileLandscape ? vh : vh * 0.7; 
+    
+    CONFIG.vScale = isMobileLandscape ? 0.60 : 0.88; 
+    // Higher track position for full-screen immersive view
+    CONFIG.trackY = isMobileLandscape ? canvas.height * 0.78 : canvas.height * 0.85;
 }
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
@@ -250,8 +288,17 @@ function spawnTreeLayered() {
 }
 
 function updateDashboard() {
-    document.getElementById('notch-val').innerText = `N ${throttleNotch}`;
-    if (brakeNotch > 0) document.getElementById('notch-val').innerText = `B ${brakeNotch}`;
+    let notchLabel = `N ${throttleNotch}`;
+    if (brakeNotch > 0) notchLabel = `B ${brakeNotch}`;
+    
+    // Laptop Dashboard Sync
+    document.getElementById('notch-val').innerText = notchLabel;
+    
+    // 📱 Pro Mobile HUD Sync
+    const mSpeed = document.getElementById('mobile-speed');
+    const mNotch = document.getElementById('mobile-notch');
+    if(mSpeed) mSpeed.innerText = `${Math.round(speed * 10)} KM/H`;
+    if(mNotch) mNotch.innerText = notchLabel;
 }
 
 function speakALP(text) {
@@ -407,6 +454,9 @@ function update() {
         let targetCrowdVol = isNear ? 0.4 : 0;
         crowdAudio.volume += (targetCrowdVol - crowdAudio.volume) * 0.05;
         if(crowdAudio.volume > 0.01 && crowdAudio.paused) crowdAudio.play().catch(()=>{});
+    } else if (crowdAudio) {
+        crowdAudio.volume = 0;
+        crowdAudio.pause();
     }
 
     let traction = (weather === 'RAIN' || weather === 'STORM') ? 0.65 : 1.0;

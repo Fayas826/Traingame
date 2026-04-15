@@ -22,6 +22,19 @@
 
         <div id="mission-stat">MISSION: KOLLAM → TVC</div>
 
+        <!-- 📱 PRO MOBILE MINIMALIST HUD (V151.30) -->
+        <div class="mobile-hud">
+            <span id="mobile-speed">0 KM/H</span>
+            <span style="color: rgba(255,255,255,0.3)">|</span>
+            <span id="mobile-notch">N0</span>
+        </div>
+
+        <div class="touch-controls">
+            <div class="touch-zone left" onclick="window.notchUp(); window.createRipple(event)"><span>+</span><span>⚡</span><span>NOTCH</span></div>
+            <div class="touch-zone right" onclick="window.notchDown(); window.createRipple(event)"><span>-</span><span>🛑</span><span>BRAKE</span></div>
+        </div>
+        <button class="mobile-horn-btn" onclick="window.horn(); window.createRipple(event)">🎺</button>
+
         <canvas id="gameCanvas"></canvas>
 
         <div id="cockpit-ui">
