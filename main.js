@@ -59,6 +59,11 @@ const BRIDGE_ZONES = [
 ];
 
 const getStructuralType = (worldX) => {
+    // 🧬 STATION CLEARANCE PRIORITY (New V152.2)
+    // If we are within 3km of ANY station, force GROUND to prevent bridge collisions
+    const isStationZone = stations.some(s => Math.abs(worldX - s.x) < 3000);
+    if(isStationZone) return { main: 'ground' };
+
     const zone = BRIDGE_ZONES.find(z => worldX >= z.start && worldX <= z.end);
     return zone ? { main: 'bridge', sub: zone.type } : { main: 'ground' };
 };
@@ -348,12 +353,12 @@ function update() {
     }
 
     if (gameState === G_STATE.APPROACHING) {
-        // Auto-Slow Assist
-        if (Math.abs(distFromStation) < 800 && speed > 5 && brakeNotch === 0) {
+        // Auto-Slow Assist (Protected)
+        if (nearestStation.isStoppage && Math.abs(distFromStation) < 800 && speed > 5 && brakeNotch === 0) {
              speed *= 0.98;
         }
         
-        if (Math.abs(distFromStation) < 150 && speed < 1.0) {
+        if (nearestStation.isStoppage && Math.abs(distFromStation) < 150 && speed < 1.0) {
             speed = 0;
             gameState = G_STATE.STOPPED;
             currentStationIdx = nearestIdx;
@@ -1355,7 +1360,7 @@ function drawTree(t) {
 }
 
 function drawStationProcedural(x, name) {
-    const pW = sc(15000); // 🚉 MEGA PLATFORM UPGRADE (Grand Scale)
+    const pW = sc(2000); // 🚉 REALISTIC PLATFORM SCALE (V152.2)
     const platformY = CONFIG.trackY - sc(10); 
     
     // 🧱 1. THE PLATFORM SLAB (3D Depth)
