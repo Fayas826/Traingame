@@ -1863,4 +1863,4 @@ function drawLevelCrossing(sx, id) {
     ctx.fillText("STOP", signX, gateY - sc(216));
 }
 
-\nwindow.onload = init;
+window.onload = init;
