@@ -303,7 +303,7 @@ function resize() {
     CONFIG.trainX = isMobileLandscape ? (canvas.width * 0.25) : 450;
     
     // Higher track position for full-screen immersive view
-    CONFIG.trackY = isMobileLandscape ? canvas.height * 0.78 : canvas.height * 0.85;
+    CONFIG.trackY = isMobileLandscape ? canvas.height * 0.78 : canvas.height * 0.75;
 }
 
 function spawnMountain() { mountains.push({ x: Math.random() * canvas.width * 4, sz: 1200 + Math.random() * 800, h: 500 + Math.random() * 400 }); }
@@ -1754,7 +1754,7 @@ function drawEarthenBase(isSunset, isNight) {
 function drawConcreteBridgeLower(isSunset, isNight) {
     const archWidth = 600;
     const startX = - (worldDistance % archWidth) - archWidth;
-    const waterY = CONFIG.trackY + sc(120);
+    const waterY = CONFIG.trackY + sc(50);
 
     for (let i = 0; i < 12; i++) {
         let x = startX + (i * archWidth);
@@ -1774,7 +1774,7 @@ function drawConcreteBridgeLower(isSunset, isNight) {
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
         ctx.beginPath();
-        ctx.arc(x + archWidth/2, waterY, sc(180), Math.PI, 0);
+        ctx.arc(x + archWidth/2, waterY, sc(110), Math.PI, 0);
         ctx.fill();
         ctx.restore();
         
@@ -1786,7 +1786,7 @@ function drawConcreteBridgeLower(isSunset, isNight) {
 
 function drawMovingWater(isNight) {
     waterOffset += 0.8;
-    const waterY = CONFIG.trackY + sc(120);
+    const waterY = CONFIG.trackY + sc(50);
     
     // 🌊 1. DEEP WATER GRADIENT
     let grd = ctx.createLinearGradient(0, waterY, 0, canvas.height);
@@ -1810,7 +1810,7 @@ function drawMovingWater(isNight) {
 
 // 🌘 REALISM PASS: REFLECTIONS & SHADOWS
 function drawReflectionAndShadow(isSunset, isNight) {
-    const waterY = CONFIG.trackY + sc(120);
+    const waterY = CONFIG.trackY + sc(50);
     const sType = getStructuralType(worldDistance + 400);
     if(sType.sub !== 'WATER') return;
 
