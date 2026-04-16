@@ -353,9 +353,12 @@ function update() {
     }
 
     if (gameState === G_STATE.APPROACHING) {
-        // Auto-Slow Assist (Protected)
-        if (nearestStation.isStoppage && Math.abs(distFromStation) < 800 && speed > 5 && brakeNotch === 0) {
-             speed *= 0.98;
+        // 🎬 CINEMATIC AUTO-STOP (Aggressive for Stoppages)
+        if (nearestStation.isStoppage && Math.abs(distFromStation) < 1200) {
+             // Dramatically reduce speed as we enter the platform
+             let brakeFactor = Math.abs(distFromStation) < 400 ? 0.92 : 0.97;
+             speed *= brakeFactor;
+             if (speed < 0.2) speed = 0; // Final snap to stop
         }
         
         if (nearestStation.isStoppage && Math.abs(distFromStation) < 150 && speed < 1.0) {
