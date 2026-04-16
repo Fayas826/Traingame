@@ -44,6 +44,7 @@ const G_STATE = {
 };
 let gameState = G_STATE.RUNNING;
 let currentStationIdx = -1;
+let targetStationIdx = -1; // 🎯 TARGET LOCK (New V153.1)
 let dwellTimer = 0;
 let doorOpenAmount = 0; 
 let isWaitingForStarter = true;
@@ -137,8 +138,8 @@ function init() {
     const storyboard = ['GREEN', 'GREEN', 'GREEN', 'YELLOW', 'GREEN', 'GREEN', 'DOUBLE_YELLOW', 'YELLOW', 'RED'];
     for(let j=0; j<150; j++) {
         let aspect = (j < storyboard.length) ? storyboard[j] : 'GREEN';
-        // 🎯 SHIFTED: Start first signal 3km ahead to prevent "Emergency Ambush"
-        let sigX = 3000 + j * 4000;
+        // 🎯 SHIFTED: First signal at 1.2km for immediate visibility
+        let sigX = 1200 + j * 4000;
         
         // 🚉 NEW: Starter Logic (Only for Stoppage Stations)
         let nearStation = stations.find(s => sigX > s.x && sigX < s.x + 2000);
@@ -352,6 +353,7 @@ function update() {
     if (Math.abs(distFromStation) < 1500 && gameState === G_STATE.RUNNING) {
         if (nearestStation.isStoppage) {
             gameState = G_STATE.APPROACHING;
+            targetStationIdx = nearestIdx; // 🔒 LOCK TARGET
             speakALP(`Approaching ${nearestStation.name}. Reduce throttle.`);
         } else if (!nearestStation.skipAnnounced) {
             // 🚀 EXPRESS SKIP ANNOUNCEMENT
@@ -361,18 +363,24 @@ function update() {
     }
 
     if (gameState === G_STATE.APPROACHING) {
+        let tStation = stations[targetStationIdx];
+        if(!tStation) { gameState = G_STATE.RUNNING; return; }
+        
+        // Use locked station for all calculations
+        let dToT = tStation.x - worldDistance;
+
         // 🎬 CINEMATIC AUTO-STOP (Aggressive for Stoppages)
-        if (nearestStation.isStoppage && Math.abs(distFromStation) < 1200) {
-             // Dramatically reduce speed as we enter the platform
-             let brakeFactor = Math.abs(distFromStation) < 400 ? 0.92 : 0.97;
+        if (Math.abs(dToT) < 1200) {
+             let brakeFactor = Math.abs(dToT) < 400 ? 0.92 : 0.97;
              speed *= brakeFactor;
              if (speed < 0.2) speed = 0; // Final snap to stop
         }
         
-        if (nearestStation.isStoppage && Math.abs(distFromStation) < 150 && speed < 1.0) {
+        if (Math.abs(dToT) < 150 && speed < 1.0) {
             speed = 0;
             gameState = G_STATE.STOPPED;
-            currentStationIdx = nearestIdx;
+            currentStationIdx = targetStationIdx;
+            targetStationIdx = -1; // 🔓 UNLOCK
             speakALP(`Train stopped at ${nearestStation.name}. Opening doors.`);
         }
     }
