@@ -694,6 +694,7 @@ function update() {
     // 🚧 LC GATE ANIMATION (Flashing Lights)
     window.lcFlash = (Math.sin(Date.now() / 200) > 0);
 }
+}
 
 function draw() {
     ctx.save();
