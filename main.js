@@ -460,7 +460,7 @@ function update() {
     
     let distKM = worldDistance / 1000;
     // Storm only in specific Ghat sections (Long stretches)
-    isRaining = (distKM > 60 && distKM < 100) || (distKM > 220); 
+    isRaining = (distKM > 120 && distKM < 160) || (distKM > 220); 
     weather = isRaining ? 'RAIN' : 'CLEAR';
     rainAlpha = isRaining ? Math.min(rainAlpha + 0.01, 0.6) : Math.max(rainAlpha - 0.01, 0);
 
