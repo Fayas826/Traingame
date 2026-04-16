@@ -119,23 +119,31 @@ function init() {
     }
     for(let i=0; i<50; i++) mistParticles.push({ x: Math.random()*2000, y: CONFIG.trackY - 250 + Math.random()*200, sz: 50+Math.random()*150, dx: 0.2 + Math.random()*0.4 });
     
-    // 🚉 6-STATION MISSION (Kollam -> TVC)
-    stations.push({ id: 'STAT_0', name: "KOLLAM JCT", x: 0, annDone: false, isStarter: true });
-    stations.push({ id: 'STAT_1', name: "PARAVUR", x: 40000, annDone: false });
-    stations.push({ id: 'STAT_2', name: "VARKALA SIVAGIRI", x: 80000, annDone: false });
-    stations.push({ id: 'STAT_3', name: "KADAKKAVUR", x: 120000, annDone: false });
-    stations.push({ id: 'STAT_4', name: "CHIRAYINKEEZHU", x: 160000, annDone: false });
-    stations.push({ id: 'STAT_5', name: "TRIVANDRUM CENTRAL", x: 200000, annDone: false });
+    // 🚉 6-STATION MISSION (Kollam -> TVC) - [CLIENT STORYBOARDED]
+    stations.push({ id: 'STAT_0', name: "KOLLAM JCT", x: 0, annDone: false, isStarter: true, isStoppage: true });
+    stations.push({ id: 'STAT_1', name: "PARAVUR", x: 40000, annDone: false, isStoppage: false }); // SKIP
+    stations.push({ id: 'STAT_2', name: "VARKALA SIVAGIRI", x: 80000, annDone: false, isStoppage: true });
+    stations.push({ id: 'STAT_3', name: "KADAKKAVUR", x: 120000, annDone: false, isStoppage: false }); // SKIP
+    stations.push({ id: 'STAT_4', name: "CHIRAYINKEEZHU", x: 160000, annDone: false, isStoppage: false }); // SKIP
+    stations.push({ id: 'STAT_5', name: "TRIVANDRUM CENTRAL", x: 200000, annDone: false, isStoppage: true });
 
-    // 🚦 SIGNAL SEQUENCE
-    const seq = ['GREEN', 'GREEN', 'GREEN', 'YELLOW', 'DOUBLE_YELLOW', 'YELLOW', 'RED'];
+    // 🚦 SIGNAL SEQUENCE (Hard-coded to match client screenshot 3/3)
+    const storyboard = ['GREEN', 'GREEN', 'GREEN', 'YELLOW', 'GREEN', 'GREEN', 'DOUBLE_YELLOW', 'YELLOW', 'RED'];
     for(let j=0; j<150; j++) {
-        let aspect = seq[j % seq.length];
+        let aspect = (j < storyboard.length) ? storyboard[j] : 'GREEN';
         let sigX = 800 + j * 4000;
         
-        // 🚉 NEW: Tag signals near ANY station exit as Starters
-        let isStart = stations.some(s => sigX > s.x && sigX < s.x + 2000);
-        if(isStart) aspect = 'RED'; 
+        // 🚉 NEW: Starter Logic (Only for Stoppage Stations)
+        let nearStation = stations.find(s => sigX > s.x && sigX < s.x + 2000);
+        let isStart = nearStation ? true : false;
+        
+        // IF it's a skip station, force the starter to GREEN always
+        if(isStart && !nearStation.isStoppage) {
+            aspect = 'GREEN';
+            isStart = false; // Don't trigger 'Waiting for Starter' at skip stations
+        } else if (isStart) {
+            aspect = 'RED';
+        }
 
         signals.push({ 
             id: `SIG_${j}`, 
@@ -144,6 +152,9 @@ function init() {
             isStarter: isStart 
         });
     }
+
+    // 🚧 LEVEL CROSSING (LC) INFRASTRUCTURE
+    window.LC_ZONES = [15000, 45000, 95000, 135000, 175000];
 
     // ⏱️ WEATHER TRANSITION (Strict Distance-Based Logic - No Randomness)
     // Removed setInterval random weather to prevent confusion.
@@ -324,18 +335,24 @@ function update() {
         if(Math.abs(d) < Math.abs(distFromStation)) { distFromStation = d; nearestStation = s; nearestIdx = i; } 
     });
 
-    // 🚉 APPROACHING & STOPPING LOGIC
+    // 🚉 APPROACHING & STOPPING LOGIC (EXPRESS SKIP COMPATIBLE)
     if (Math.abs(distFromStation) < 1500 && gameState === G_STATE.RUNNING) {
-        gameState = G_STATE.APPROACHING;
-        speakALP(`Approaching ${nearestStation.name}. Reduce throttle.`);
+        if (nearestStation.isStoppage) {
+            gameState = G_STATE.APPROACHING;
+            speakALP(`Approaching ${nearestStation.name}. Reduce throttle.`);
+        } else if (!nearestStation.skipAnnounced) {
+            // 🚀 EXPRESS SKIP ANNOUNCEMENT
+            speakALP(`Skipping ${nearestStation.name}. Keep full speed.`);
+            nearestStation.skipAnnounced = true;
+        }
     }
 
     if (gameState === G_STATE.APPROACHING) {
-        // Auto-Slow Assist: If speed > 5 and player not braking, apply soft brakes
+        // Auto-Slow Assist
         if (Math.abs(distFromStation) < 800 && speed > 5 && brakeNotch === 0) {
-             speed *= 0.98; // Soft programmatic brake
+             speed *= 0.98;
         }
-        // 🏁 PRO-DOCKING (Final Sync Fix): Increased radius (150m) + Snap-to-Stop
+        
         if (Math.abs(distFromStation) < 150 && speed < 1.0) {
             speed = 0;
             gameState = G_STATE.STOPPED;
@@ -612,12 +629,12 @@ function update() {
         if(p.a <= 0) particles.splice(i, 1);
     });
 
-    // 🚦 ALP SIGNAL CALLOUTS (CLIENT SPEC 3/9)
-    let msg = isWaitingForStarter ? "🔴 Waiting for signal" : "🟢 Starter signal green";
+    // 🚦 ALP SIGNAL CALLOUTS (CLIENT STORYBOARD SYNC)
+    let msg = isWaitingForStarter ? "🔴 Waiting for signal" : "🟢 STARTER Signal green";
     signals.forEach(s => {
         let dist = s.x - worldDistance;
         if(dist > 0 && dist < 1200) {
-            if(s.aspect === 'YELLOW') msg = "🟡 Distant yellow – caution";
+            if(s.aspect === 'YELLOW') msg = "🟡 Distant yellow signal, caution";
             if(s.aspect === 'DOUBLE_YELLOW') msg = "🟡🟡 Distant double yellow";
             if(s.aspect === 'RED' && !isWaitingForStarter) msg = "🔴 Home Signal - Danger";
         }
@@ -631,6 +648,9 @@ function update() {
         document.getElementById('signal-callout').innerText = msg;
         if(audioStarted) speakALP(msg.replace(/🔴|🟡|🟢|🟡🟡|📢 /g, ''));
     }
+
+    // 🚧 LC GATE ANIMATION (Flashing Lights)
+    window.lcFlash = (Math.sin(Date.now() / 200) > 0);
 }
 
 function draw() {
@@ -664,6 +684,16 @@ function draw() {
         skyGrd.addColorStop(1, `hsl(200, 90%, ${skyBrightRaw * (isRaining ? 0.6 : 1) + 20}%)`);
     }
     ctx.fillStyle = skyGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // --- 🚧 LEVEL CROSSING (LC) RENDER ---
+    if(window.LC_ZONES) {
+        window.LC_ZONES.forEach((lcX, i) => {
+            let sx = lcX - worldDistance + (canvas.width / 2);
+            if(sx > -400 && sx < canvas.width + 400) {
+                drawLevelCrossing(sx, i);
+            }
+        });
+    }
 
         // (God-rays and birds removed to match image)
     
@@ -1769,4 +1799,68 @@ function drawReflectionAndShadow(isSunset, isNight) {
     ctx.restore();
 }
 
-window.onload = init;
+
+function drawLevelCrossing(sx, id) {
+    const roadW = sc(500);
+    const gateY = CONFIG.trackY;
+    
+    // 🛣️ 1. ROAD SURFACE
+    ctx.fillStyle = '#222';
+    ctx.fillRect(sx - roadW/2, gateY, roadW, sc(60));
+    
+    // 🎨 2. ROAD MARKINGS
+    ctx.fillStyle = '#eee';
+    for(let j=0; j<5; j++) {
+        ctx.fillRect(sx - roadW/2 + (j*sc(110)), gateY + sc(20), sc(60), sc(10));
+    }
+
+    // 🚧 3. LC POSTS & GATES
+    const postX = [sx - roadW/2 - sc(20), sx + roadW/2 + sc(20)];
+    postX.forEach(px => {
+        // Base Post
+        ctx.fillStyle = '#444'; ctx.fillRect(px, gateY - sc(250), sc(15), sc(250));
+        
+        // Gate Arm (Yellow/Black Stripes)
+        ctx.save();
+        ctx.translate(px + sc(7.5), gateY - sc(80));
+        
+        // Rotate gate down as train approaches
+        let dist = Math.abs(sx - CONFIG.trainX);
+        let angle = (dist < 1000) ? 0 : -Math.PI/3; 
+        ctx.rotate(angle);
+        
+        const armL = sc(450);
+        ctx.fillStyle = '#f1c40f'; // Yellow
+        ctx.fillRect(0, -sc(10), (px < sx ? armL : -armL), sc(20));
+        
+        // Black Stripes
+        ctx.fillStyle = '#111';
+        for(let k=0; k<10; k++) {
+            ctx.fillRect((px < sx ? k*sc(45) : -k*sc(45)), -sc(10), sc(20), sc(20));
+        }
+        ctx.restore();
+
+        // 🔴 FLASHING LIGHTS
+        ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(px + sc(7.5), gateY - sc(150), sc(18), 0, Math.PI*2); ctx.fill();
+        if(window.lcFlash && dist < 3000) {
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath(); ctx.arc(px + sc(7.5), gateY - sc(150), sc(12), 0, Math.PI*2); ctx.fill();
+            // Glow
+            ctx.shadowBlur = 15; ctx.shadowColor = 'red'; ctx.stroke(); ctx.shadowBlur = 0;
+        }
+    });
+
+    // 🚩 STOP SIGNS
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath();
+    let signX = sx - roadW/2 - sc(80);
+    ctx.moveTo(signX, gateY - sc(220));
+    for(let a=0; a<8; a++) {
+        ctx.lineTo(signX + sc(25)*Math.cos(a*Math.PI/4), gateY - sc(220) + sc(25)*Math.sin(a*Math.PI/4));
+    }
+    ctx.fill();
+    ctx.fillStyle = 'white'; ctx.font = `bold ${sc(10)}px Arial`; ctx.textAlign = 'center';
+    ctx.fillText("STOP", signX, gateY - sc(216));
+}
+
+\nwindow.onload = init;
