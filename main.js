@@ -396,6 +396,7 @@ function update() {
             }
             targetStationIdx = -1; // 🔓 UNLOCK
         }
+    }
 
     // 🚪 DOOR & BOARDING SEQUENCE
     if (gameState === G_STATE.STOPPED) {
