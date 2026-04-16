@@ -78,6 +78,9 @@ let particles = [];
 for(let i=0; i<150; i++) stars.push({x: Math.random()*3000, y: Math.random()*800, s: Math.random()*2.5 + 0.5, a: Math.random()});
 
 function init() {
+    // 🧹 NUCLEAR CLEARANCE (V153.2 - Prevents Duplicate Spawns)
+    stations = []; signals = []; trees = []; clouds = []; foregroundObjects = [];
+    
     canvas = document.getElementById(CONFIG.canvasId);
     ctx = canvas.getContext('2d', { alpha: false });
     
@@ -528,7 +531,8 @@ function update() {
         const visualOffset = (canvas.width / 2) - CONFIG.trainX;
         let distToSignalVisual = nextSignal.x - worldDistance + visualOffset;
         
-        // AWS triggers when the visual light is within 500m of the FRONT of the train
+        // 🔒 AWS DEACTIVATION: Restoration of Manual Control (V153.2)
+        /*
         if (distToSignalVisual < 500 && distToSignalVisual > -100) {
             if (nextSignal.aspect === 'RED' && speed > 0.1) {
                 window.emergencyBrake();
@@ -536,6 +540,7 @@ function update() {
                 if (Math.random() < 0.01) speakALP("Caution! Check speed.");
             }
         }
+        */
     }
 
     if(speed > CONFIG.maxSpeed && throttleNotch > 6) {
