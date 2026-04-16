@@ -1797,7 +1797,9 @@ function drawReflectionAndShadow(isSunset, isNight) {
     // We only reflect the WAP-7 body for performance
     drawWAP7Procedural(CONFIG.trainX, CONFIG.trackY);
     ctx.restore();
-}\n\nfunction drawLevelCrossing(sx, id) {
+}
+
+function drawLevelCrossing(sx, id) {
     const roadW = sc(500);
     const gateY = CONFIG.trackY;
     
@@ -1855,4 +1857,4 @@ function drawReflectionAndShadow(isSunset, isNight) {
     ctx.fillText('STOP', signX, gateY - sc(216));
 }
 
-window.onload = init;\n
+window.onload = init;
