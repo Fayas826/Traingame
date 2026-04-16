@@ -28,6 +28,7 @@ let oppTrain = null, weather = 'CLEAR', rainAlpha = 0; // ⛈️ WEATHER ENGINE
 let rainAudio;
 let tunnelAlpha = 0;
 let waterOffset = 0; // 🌊 WATER PHYSICS ENGINE
+let isEmergencyActive = false; // 🚨 REAL EMERGENCY TRACKER
 
 // 📏 Scaling Helper (FIXED: Defined once)
 const sc = (val) => val * CONFIG.vScale;
@@ -132,11 +133,12 @@ function init() {
     stations.push({ id: 'STAT_4', name: "CHIRAYINKEEZHU", x: 160000, annDone: false, isStoppage: false }); // SKIP
     stations.push({ id: 'STAT_5', name: "TRIVANDRUM CENTRAL", x: 200000, annDone: false, isStoppage: true });
 
-    // 🚦 SIGNAL SEQUENCE (Hard-coded to match client screenshot 3/3)
+    // 🚦 SIGNAL SEQUENCE (Hard-coded to match client storyboard 3/3)
     const storyboard = ['GREEN', 'GREEN', 'GREEN', 'YELLOW', 'GREEN', 'GREEN', 'DOUBLE_YELLOW', 'YELLOW', 'RED'];
     for(let j=0; j<150; j++) {
         let aspect = (j < storyboard.length) ? storyboard[j] : 'GREEN';
-        let sigX = 800 + j * 4000;
+        // 🎯 SHIFTED: Start first signal 3km ahead to prevent "Emergency Ambush"
+        let sigX = 3000 + j * 4000;
         
         // 🚉 NEW: Starter Logic (Only for Stoppage Stations)
         let nearStation = stations.find(s => sigX > s.x && sigX < s.x + 2000);
@@ -238,7 +240,13 @@ function init() {
 
     window.horn = () => { if(hornAudio) { hornAudio.currentTime = 0; hornAudio.play(); } };
     window.toggleLights = () => { lampsOn = !lampsOn; document.getElementById('light-btn').classList.toggle('active', lampsOn); };
-    window.emergencyBrake = () => { brakeNotch = 5; throttleNotch = 0; updateDashboard(); speakALP("Emergency Brake Applied!"); };
+    window.emergencyBrake = () => { 
+        isEmergencyActive = true; 
+        brakeNotch = 5; 
+        throttleNotch = 0; 
+        updateDashboard(); 
+        speakALP("Emergency Brake Applied! Signal Jump or Collision threat detected."); 
+    };
     
     // ⚔️ IMMERSIVE ENGINE (Fullscreen API)
     window.toggleFullscreen = () => {
@@ -413,6 +421,9 @@ function update() {
         // 🎯 2. DEPARTURE: Timer ends
         if(starterTimer <= 0) {
             isWaitingForStarter = false;
+            // 🚀 AUTO-RELEASE: Set brakes to B0 and notch to P1 for smooth takeoff
+            brakeNotch = 0;
+            throttleNotch = 1; 
             speakALP("Starter signal green. You are cleared to depart.");
             if (gameState === G_STATE.DEPARTING) gameState = G_STATE.RUNNING;
         }
@@ -1071,12 +1082,12 @@ function drawDDUDisplay() {
         // 🕒 Precise 7s Countdown (Frame based)
         let timeLeft = Math.max(0, (dwellTimer / 60)).toFixed(1);
         dctx.fillText(`STATUS: BOARDING (${timeLeft}s)`, 15, 80);
-    } else if (brakeNotch === 5 && speed === 0 && throttleNotch === 0) {
+    } else if (isEmergencyActive) {
         dctx.fillStyle = '#ff3333';
         dctx.fillText("STATUS: EMERGENCY - SIGNAL JUMP", 15, 80);
     } else {
         dctx.fillStyle = '#00ff44';
-        dctx.fillText(`NOTCH: ${throttleNotch > 0 ? "P" + throttleNotch : (brakeNotch > 0 ? "B" + brakeNotch : "N0")}`, 15, 80);
+        dctx.fillText(`STATUS: ${throttleNotch > 0 ? "TRACTION MANOEUVER" : "COASTING"}`, 15, 80);
     }
     
     let bp = (5.0 - (brakeNotch * 0.4)).toFixed(1);
