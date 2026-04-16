@@ -1797,34 +1797,28 @@ function drawReflectionAndShadow(isSunset, isNight) {
     // We only reflect the WAP-7 body for performance
     drawWAP7Procedural(CONFIG.trainX, CONFIG.trackY);
     ctx.restore();
-}
-
-
-function drawLevelCrossing(sx, id) {
+}\n\nfunction drawLevelCrossing(sx, id) {
     const roadW = sc(500);
     const gateY = CONFIG.trackY;
     
-    // 🛣️ 1. ROAD SURFACE
+    // Road Surface
     ctx.fillStyle = '#222';
     ctx.fillRect(sx - roadW/2, gateY, roadW, sc(60));
     
-    // 🎨 2. ROAD MARKINGS
+    // Markings
     ctx.fillStyle = '#eee';
     for(let j=0; j<5; j++) {
         ctx.fillRect(sx - roadW/2 + (j*sc(110)), gateY + sc(20), sc(60), sc(10));
     }
 
-    // 🚧 3. LC POSTS & GATES
+    // LC Posts & Gates
     const postX = [sx - roadW/2 - sc(20), sx + roadW/2 + sc(20)];
     postX.forEach(px => {
-        // Base Post
         ctx.fillStyle = '#444'; ctx.fillRect(px, gateY - sc(250), sc(15), sc(250));
         
-        // Gate Arm (Yellow/Black Stripes)
         ctx.save();
         ctx.translate(px + sc(7.5), gateY - sc(80));
         
-        // Rotate gate down as train approaches
         let dist = Math.abs(sx - CONFIG.trainX);
         let angle = (dist < 1000) ? 0 : -Math.PI/3; 
         ctx.rotate(angle);
@@ -1833,24 +1827,22 @@ function drawLevelCrossing(sx, id) {
         ctx.fillStyle = '#f1c40f'; // Yellow
         ctx.fillRect(0, -sc(10), (px < sx ? armL : -armL), sc(20));
         
-        // Black Stripes
         ctx.fillStyle = '#111';
         for(let k=0; k<10; k++) {
             ctx.fillRect((px < sx ? k*sc(45) : -k*sc(45)), -sc(10), sc(20), sc(20));
         }
         ctx.restore();
 
-        // 🔴 FLASHING LIGHTS
+        // Flashing Lights
         ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(px + sc(7.5), gateY - sc(150), sc(18), 0, Math.PI*2); ctx.fill();
         if(window.lcFlash && dist < 3000) {
             ctx.fillStyle = '#ff0000';
             ctx.beginPath(); ctx.arc(px + sc(7.5), gateY - sc(150), sc(12), 0, Math.PI*2); ctx.fill();
-            // Glow
             ctx.shadowBlur = 15; ctx.shadowColor = 'red'; ctx.stroke(); ctx.shadowBlur = 0;
         }
     });
 
-    // 🚩 STOP SIGNS
+    // Stop Signs
     ctx.fillStyle = '#c0392b';
     ctx.beginPath();
     let signX = sx - roadW/2 - sc(80);
@@ -1859,8 +1851,8 @@ function drawLevelCrossing(sx, id) {
         ctx.lineTo(signX + sc(25)*Math.cos(a*Math.PI/4), gateY - sc(220) + sc(25)*Math.sin(a*Math.PI/4));
     }
     ctx.fill();
-    ctx.fillStyle = 'white'; ctx.font = `bold ${sc(10)}px Arial`; ctx.textAlign = 'center';
-    ctx.fillText("STOP", signX, gateY - sc(216));
+    ctx.fillStyle = 'white'; ctx.font = 'bold ' + sc(10) + 'px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('STOP', signX, gateY - sc(216));
 }
 
-window.onload = init;
+window.onload = init;\n
