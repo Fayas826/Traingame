@@ -388,6 +388,18 @@ function update() {
         }
     }
 
+    // 🏁 MISSION END: TRIVANDRUM CENTRAL AUTO-LOCK (V153.6)
+    if (worldDistance >= 199980) {
+        speed = 0;
+        brakeNotch = 100; // Hard Lock
+        gameState = G_STATE.STOPPED;
+        document.getElementById('signal-callout').innerHTML = "🚩 MISSION ACCOMPLISHED";
+        if (!window.finalAnnounced) {
+            speakALP("Attention Passengers. We have reached our final destination, Trivandrum Central. Thank you for traveling with Indian Railways.");
+            window.finalAnnounced = true;
+        }
+    }
+
     // 🚪 DOOR & BOARDING SEQUENCE
     if (gameState === G_STATE.STOPPED) {
         if (doorOpenAmount === 0) speakALP("Opening doors.");
@@ -711,11 +723,18 @@ function draw() {
         skyGrd.addColorStop(0.5, '#e67e22'); // Orange horizon
         skyGrd.addColorStop(1, '#f39c12'); // Gold
     } else {
-        // Vibrant Sky Blue to match assets
-        skyGrd.addColorStop(0, `hsl(210, 80%, ${skyBrightRaw * (isRaining ? 0.6 : 1)}%)`); 
-        skyGrd.addColorStop(1, `hsl(200, 90%, ${skyBrightRaw * (isRaining ? 0.6 : 1) + 20}%)`);
+        // Vibrant Sky Blue to match assets (Storm Darkening Applied 🔥)
+        let stormFactor = 1.0 - (rainAlpha * 0.8); // Darken by up to 80% during storm
+        skyGrd.addColorStop(0, `hsl(210, ${80 * stormFactor}%, ${skyBrightRaw * (isRaining ? 0.4 : 1) * stormFactor}%)`); 
+        skyGrd.addColorStop(1, `hsl(200, ${90 * stormFactor}%, ${(skyBrightRaw * (isRaining ? 0.4 : 1) + 20) * stormFactor}%)`);
     }
     ctx.fillStyle = skyGrd; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // ⛈️ VOLUMETRIC STORM OVERLAY (Ambient Darkness)
+    if (rainAlpha > 0.05) {
+        ctx.fillStyle = `rgba(15, 25, 35, ${rainAlpha * 0.55})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     // --- 🚧 LEVEL CROSSING (LC) RENDER ---
     if(window.LC_ZONES) {
@@ -776,6 +795,7 @@ function draw() {
 
         let cColor;
         if (isNight) cColor = isNearMoon ? `rgba(220, 220, 255, ${baseAlpha})` : `rgba(80, 80, 95, ${baseAlpha})`;
+        else if (isRaining) cColor = `rgba(60, 65, 75, ${baseAlpha})`; // ⛈️ Leaden Storm Clouds
         else if (isSunset) cColor = `rgba(255, 200, 150, ${baseAlpha})`;
         else cColor = `rgba(240, 248, 255, ${baseAlpha})`;
 
