@@ -383,22 +383,19 @@ function update() {
             speed = 0;
             gameState = G_STATE.STOPPED;
             currentStationIdx = targetStationIdx;
+            
+            // 🏁 MISSION END: TRIVANDRUM CENTRAL FINALE (V153.8 - SMOOTH ARRIVAL)
+            if (nearestStation.id === 'STAT_5') {
+                 document.getElementById('signal-callout').innerHTML = "🚩 MISSION ACCOMPLISHED";
+                 if (!window.finalAnnounced) {
+                    speakALP("Attention Passengers. We have reached our final destination, Trivandrum Central. Thank you for traveling with Indian Railways.");
+                    window.finalAnnounced = true;
+                }
+            } else {
+                speakALP(`Train stopped at ${nearestStation.name}. Opening doors.`);
+            }
             targetStationIdx = -1; // 🔓 UNLOCK
-            speakALP(`Train stopped at ${nearestStation.name}. Opening doors.`);
         }
-    }
-
-    // 🏁 MISSION END: TRIVANDRUM CENTRAL AUTO-LOCK (V153.6)
-    if (worldDistance >= 199980) {
-        speed = 0;
-        brakeNotch = 100; // Hard Lock
-        gameState = G_STATE.STOPPED;
-        document.getElementById('signal-callout').innerHTML = "🚩 MISSION ACCOMPLISHED";
-        if (!window.finalAnnounced) {
-            speakALP("Attention Passengers. We have reached our final destination, Trivandrum Central. Thank you for traveling with Indian Railways.");
-            window.finalAnnounced = true;
-        }
-    }
 
     // 🚪 DOOR & BOARDING SEQUENCE
     if (gameState === G_STATE.STOPPED) {
