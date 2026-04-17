@@ -384,7 +384,7 @@ function update() {
             gameState = G_STATE.STOPPED;
             currentStationIdx = targetStationIdx;
             
-            // 🏁 MISSION END: TRIVANDRUM CENTRAL FINALE (V153.10 - SMOOTH ARRIVAL)
+            // 🏁 MISSION END: TRIVANDRUM CENTRAL FINALE (V154.0 - SMOOTH ARRIVAL)
             if (nearestStation.id === 'STAT_5') {
                  document.getElementById('signal-callout').innerHTML = "🚩 MISSION ACCOMPLISHED";
                  if (!window.finalAnnounced) {
