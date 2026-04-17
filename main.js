@@ -1,5 +1,5 @@
 /**
- * 🚂 SUPREME PROCEDURAL TRAIN ENGINE (V154.1 - FINAL COMPLIANCE)
+ * 🚂 SUPREME PROCEDURAL TRAIN ENGINE (V154.2 - FINAL COMPLIANCE)
  * 100% PARITY WITH CLIENT-CLIENT INSTRUCTIONS (FINAL)
  * [FIXED] 7-SEC STARTER: Starts with Red, flips to Green after 7s.
  * [FIXED] SIGNAL SEQUENCE: 3x Green -> Yellow -> 2x Yellow -> Home -> Red.
@@ -24,7 +24,7 @@ let stations = [], signals = [], coachOffsets = [];
 let timeOfDay = 0, wheelRotation = 0; 
 let audioStarted = false, hornAudio, locoAudio, slowTrackAudio, fastTrackAudio, crowdAudio, chimeAudio, startAudio;
 let lampsOn = false, lastAlpMsg = "", lastTrackSoundDist = 0;
-let oppTrain = null, weather = 'CLEAR', rainAlpha = 0; // ⛈️ WEATHER ENGINE
+let oppTrain = null, weather = 'CLEAR', rainAlpha = 0, isRaining = false; // ⛈️ WEATHER ENGINE
 let rainAudio;
 let tunnelAlpha = 0;
 let waterOffset = 0; // 🌊 WATER PHYSICS ENGINE
@@ -712,7 +712,7 @@ function draw() {
     let skyBrightRaw = Math.abs(500 - timeOfDay) / 5;
     
     // Day/Night & Sunset Logic
-    let isSunset = skyBrightRaw < 50 && skyBrightRaw > 25;
+    let isSunset = (skyBrightRaw < 50) && (skyBrightRaw > 25);
     let isNight = skyBrightRaw <= 25;
     let starOp = isNight ? 1 : (isSunset ? 0.3 : 0);
     let skyGrd = ctx.createLinearGradient(0,0,0,CONFIG.trackY);
