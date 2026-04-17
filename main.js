@@ -1,5 +1,5 @@
 /**
- * 🚂 SUPREME PROCEDURAL TRAIN ENGINE (V150.0 - FINAL COMPLIANCE)
+ * 🚂 SUPREME PROCEDURAL TRAIN ENGINE (V154.1 - FINAL COMPLIANCE)
  * 100% PARITY WITH CLIENT-CLIENT INSTRUCTIONS (FINAL)
  * [FIXED] 7-SEC STARTER: Starts with Red, flips to Green after 7s.
  * [FIXED] SIGNAL SEQUENCE: 3x Green -> Yellow -> 2x Yellow -> Home -> Red.
@@ -693,7 +693,6 @@ function update() {
 
     // 🚧 LC GATE ANIMATION (Flashing Lights)
     window.lcFlash = (Math.sin(Date.now() / 200) > 0);
-}
 }
 
 function draw() {
@@ -1909,3 +1908,4 @@ function drawLevelCrossing(sx, id) {
 }
 
 window.onload = init;
+
