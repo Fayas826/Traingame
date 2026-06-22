@@ -2,9 +2,13 @@
   "name": "traingame",
   "version": "1.0.0",
   "scripts": {
-    "dev": "vite"
+    "dev": "vite",
+    "build": "vite build"
   },
   "devDependencies": {
     "vite": "latest"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
   }
 }

@@ -3,96 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Realistic Train Simulator Pro | Indian Railways</title>
-    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <title>Indian Railways Pixel Simulator | 2D HD</title>
+    <meta name="description" content="High-fidelity 2D pixel-art Indian Railways train simulator. Drive from Kollam to Trivandrum Central with realistic physics and immersive audio.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="game-wrapper">
-        <div id="alp-hud">
-            <button class="fullscreen-btn" onclick="window.toggleFullscreen()" title="Fullscreen">⛶</button>
+        <!-- ALP HUD -->
+        <div id="alp-hud" class="hud-hidden">
+            <button class="fullscreen-btn" id="btn-fullscreen" title="Fullscreen">⛶</button>
             <div id="alp-container">
-                <img id="alp-avatar" src="assets/alp.png" alt="ALP">
                 <div>
                     <div id="alp-name">Assistant Loco Pilot (ALP)</div>
-                    <div id="signal-callout">🔴 Starter signal red</div>
+                    <div id="signal-callout">🔴 Waiting for signal</div>
                 </div>
             </div>
         </div>
 
-        <div id="mission-stat">MISSION: KOLLAM → TVC</div>
+        <!-- Train Debug Panel -->
+        <div id="train-debug-panel" class="hud-hidden">
+            <h3>TRAIN DEBUG PANEL</h3>
+            <div class="debug-row"><span>Speed:</span> <span id="debug-speed">0.0 KM/H</span></div>
+            <div class="debug-row"><span>Target Speed:</span> <span id="debug-target-speed">0.0 KM/H</span></div>
+            <div class="debug-row"><span>Signal Aspect:</span> <span id="debug-signal-aspect">CLEAR</span></div>
+            <div class="debug-row"><span>Brake State:</span> <span id="debug-brake-state">RELEASED</span></div>
+            <div class="debug-row"><span>Stop Reason:</span> <span id="debug-stop-reason">NONE</span></div>
+            <div class="debug-row"><span>Timetable:</span> <span id="debug-timetable-state">Passenger</span></div>
+            <div class="debug-row"><span>AI Control:</span> <span id="debug-ai-control">OFF</span></div>
+            <div class="debug-row"><span>Camera View:</span> <span id="debug-camera-view">ISOMETRIC</span></div>
+            <div style="text-align: center; margin-top: 8px; font-size: 9px; color: #888; border-top: 1px solid var(--border-subtle); padding-top: 6px; font-family: 'Inter', sans-serif;">
+                Press [A] to toggle Autopilot<br>
+                Press [C] to cycle Camera View
+            </div>
+        </div>
 
-        <!-- 📱 PRO MOBILE MINIMALIST HUD (V153.5 - MASTER CONTROL) -->
+        <!-- Mission Badge -->
+        <div id="mission-stat" class="hud-hidden">MISSION: KOLLAM → TVC (64.6 KM)</div>
+
+        <!-- Mobile HUD -->
         <div class="mobile-hud">
             <span id="mobile-speed">0 KM/H</span>
-            <span style="color: rgba(255,255,255,0.3)">|</span>
+            <span class="hud-divider">|</span>
             <span id="mobile-notch">N0</span>
         </div>
 
+        <!-- Touch Controls -->
         <div class="touch-controls">
-            <div class="touch-zone left" onclick="window.notchUp(); window.createRipple(event)"><span>+</span><span>⚡</span><span>NOTCH</span></div>
-            <div class="touch-zone right" onclick="window.notchDown(); window.createRipple(event)"><span>-</span><span>🛑</span><span>BRAKE</span></div>
+            <div class="touch-zone left" id="btn-notch-up"><span>+</span><span>⚡</span><span>NOTCH</span></div>
+            <div class="touch-zone right" id="btn-notch-down"><span>-</span><span>🛑</span><span>BRAKE</span></div>
         </div>
-        <button class="mobile-horn-btn" onclick="window.horn(); window.createRipple(event)">🎺</button>
+        <button class="mobile-horn-btn" id="btn-horn">🎺</button>
 
-        <canvas id="gameCanvas"></canvas>
+        <!-- PHASER GAME CONTAINER -->
+        <div id="game-container"></div>
 
-        <div id="cockpit-ui">
-            <!-- ⚡ COLUMN 1: ANALOG SPEEDO -->
+        <!-- COCKPIT PANEL -->
+        <div id="cockpit-ui" class="hud-hidden">
             <div class="cockpit-column">
                 <div class="speed-container">
-                    <canvas id="speedCanvas"></canvas>
+                    <div class="gauge-box"><canvas id="speedCanvas"></canvas></div>
+                    <div class="gauge-box"><canvas id="pressureCanvas"></canvas></div>
                 </div>
             </div>
-
-            <!-- 🎛️ COLUMN 2: MASTER CONTROLLER (NOTCH) -->
             <div class="cockpit-column">
-                <label style="color: #666; font-size: 0.6rem; margin-bottom: 5px;">MASTER CONTROLLER</label>
+                <label class="cockpit-label">MASTER CONTROLLER</label>
                 <div class="notch-controls">
-                    <button class="notch-btn" onclick="window.notchUp()">NOTCH +</button>
+                    <button class="notch-btn" id="btn-notch-up-desk">NOTCH +</button>
                     <div id="notch-val" class="notch-display">N 0</div>
-                    <button class="notch-btn" onclick="window.notchDown()">NOTCH -</button>
+                    <button class="notch-btn" id="btn-notch-down-desk">NOTCH -</button>
                 </div>
             </div>
-
-            <!-- 🖥️ COLUMN 3: DDU (DIAGNOSTIC DISPLAY UNIT) -->
             <div class="cockpit-column">
-                <div class="ddu-screen">
-                    <canvas id="dduCanvas"></canvas>
-                </div>
+                <div class="ddu-screen"><canvas id="dduCanvas"></canvas></div>
             </div>
-
-            <!-- ⌨️ COLUMN 4: COMMAND PANEL -->
             <div class="cockpit-column">
                 <div class="button-strip">
-                    <button onclick="window.horn()">HORN [H]</button>
-                    <button id="light-btn" onclick="window.toggleLights()">LIGHTS [L]</button>
-                    <button class="danger" onclick="window.emergencyBrake()">EMERGENCY [B]</button>
+                    <button id="btn-horn-desk">HORN [H]</button>
+                    <button id="btn-lights">LIGHTS [L]</button>
+                    <button class="danger" id="btn-ebrake">EMERGENCY [B]</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="start-overlay">
-        <div class="start-box">
-            <div style="font-size: 3rem; margin-bottom: 10px;">🇮🇳</div>
-            <h1>INDIAN RAILWAYS</h1>
-            <p>Realistic Simulator Pro</p>
-            <div style="color: #00ff88; font-size: 0.7rem; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px;">Mobile Elite Build V151.80 (Absolute Pro)</div>
-            <button onclick="startMobileAudio()">ACTIVATE SYSTEMS</button>
-            <p style="font-size: 0.6rem; color: #888; margin-top: 15px;">Landscape Mode & Fullscreen Recommended</p>
-        </div>
-    </div>
-
-    <!-- 📱 ORIENTATION LOCK OVERLAY (V151.11) -->
+    <!-- ORIENTATION LOCK -->
     <div id="orientation-overlay">
         <div class="rotate-box">
-            <div style="font-size: 3rem; margin-bottom: 15px;">🔄</div>
-            <h2 style="font-family: Arial, sans-serif; color: #00ff88;">PLEASE ROTATE DEVICE</h2>
-            <p style="color: white; font-family: Arial, sans-serif;">Landscape mode required for driving</p>
+            <div class="rotate-icon">🔄</div>
+            <h2>PLEASE ROTATE DEVICE</h2>
+            <p>Landscape mode required for driving</p>
         </div>
     </div>
 
-    <script src="main.js?v=154.2"></script>
+    <script type="module" src="src/main.js"></script>
+    <script>
+        // Fullscreen toggle
+        document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        });
+        // Desktop cockpit buttons
+        document.addEventListener('DOMContentLoaded', () => {
+            const getGS = () => {
+                const c = document.querySelector('canvas');
+                return c?.__game?.scene?.getScene?.('GameScene');
+            };
+            ['btn-notch-up-desk','btn-notch-down-desk','btn-horn-desk','btn-ebrake'].forEach(id => {
+                document.getElementById(id)?.addEventListener('click', () => {
+                    const gs = getGS(); if (!gs?.physics) return;
+                    if (id.includes('up')) gs.physics.notchUp(gs.stationMgr?.gameState, gs.stationMgr?.isWaitingForStarter);
+                    else if (id.includes('down')) gs.physics.notchDown();
+                    else if (id.includes('horn')) { gs.audio?.playHorn(); gs.stationMgr?.registerHorn(); }
+                    else if (id.includes('brake')) gs.physics.emergencyBrake();
+                });
+            });
+            document.getElementById('btn-lights')?.addEventListener('click', () => { getGS()?.train?.toggleLights(); });
+        });
+    </script>
 </body>
 </html>

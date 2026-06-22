@@ -1,0 +1,18 @@
+# Node/Vite
+node_modules/
+dist/
+.vite/
+
+# .NET Build output
+**/bin/
+**/obj/
+
+# Agent temp/generated files
+.system_generated/
+.tempmediaStorage/
+.gemini/
+*.mp4
+*.png
+prompt_dump.txt
+prompt_utf8.txt
+extract_prompt*.js
